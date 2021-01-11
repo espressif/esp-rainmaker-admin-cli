@@ -1,0 +1,2 @@
+id,node_id,mqtt_host,client_cert,client_key,random
+1,iKA9qWbmJxXXz7MM69qsyA,test/2020-12-24/Mfg-00001/common/endpoint.txt,test/2020-12-24/Mfg-00001/node_details/node-00001-iKA9qWbmJxXXz7MM69qsyA/node.crt,test/2020-12-24/Mfg-00001/node_details/node-00001-iKA9qWbmJxXXz7MM69qsyA/node.key,test/2020-12-24/Mfg-00001/node_details/node-00001-iKA9qWbmJxXXz7MM69qsyA/random.txt

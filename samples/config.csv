@@ -1,0 +1,6 @@
+rmaker_creds,namespace,
+node_id,data,binary
+mqtt_host,file,binary
+client_cert,file,binary
+client_key,file,binary
+random,file,hex2bin

@@ -1,0 +1,6 @@
+cryptography==2.9.2
+future>=0.15.2
+requests>=2.22.0
+configparser>=4.0.0,<5.0.0
+pyqrcode
+pypng==0.0.20
