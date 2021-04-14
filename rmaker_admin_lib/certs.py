@@ -808,11 +808,10 @@ def generate_qrcode(random_hex, prov_type):
     :type prov_type: str
     '''
     payload = {}
-    
     # Set version as v1 (default)
     version = 'v1'
     # Set pop as first 4 bytes (8 hex chars) of random info
-    pop = random_hex[0:7]
+    pop = random_hex[0:8]
     # Set provisioning name (last 3 bytes - 6 hex chars of random info)
     prov_name = 'PROV_' + random_hex[-6:]
     # Set transport
@@ -826,7 +825,9 @@ def generate_qrcode(random_hex, prov_type):
     
     # Create qr code
     # All parameter values like version, mode, error is set to auto
-    qrcode_gen = pyqrcode.create(str(payload))
+    payload_json_str = json.dumps(payload)
+    log.debug("Creating image for payload: {}".format(payload_json_str))
+    qrcode_gen = pyqrcode.create(payload_json_str)
     log.debug("QRcode generated")
     return payload, qrcode_gen
 
