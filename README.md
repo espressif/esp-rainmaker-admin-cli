@@ -1,257 +1,177 @@
-- [**ESP RainMaker Admin CLI**](#esp-rainmaker-admin-cli)
 - [**Introduction**](#introduction)
 - [**Setup Build Environment**](#setup-build-environment)
 - [**Workflow**](#workflow)
 - [**Usage**](#usage)
 - [**Account Operations**](#account-operations)
-- [**Certs Operations**](#certs-operations)
+- [**Device Certificate Operations**](#device-certificate-operations)
+- [**CA Certificate Operations**](#ca-certificate-operations)
+- [**Flashing**](#flashing)
 - [**Resources**](#resources)
 
-# **ESP RainMaker Admin CLI**
+# ESP RainMaker Admin CLI
 
-**Introduction**
-===================
+## Introduction
 
 ESP RainMaker Admin CLI is a tool offered by Espressif Rainmaker for admin users to be able to perform mass manufacturing of nodes of ESP32-S2 and ESP32 based products. This tool will enable you to perform node id generation and certificate registration operations required for the manufacturing process.
 
-**Setup Build Environment**
-==============================
+## Getting the Admin CLI
 
-Operating System requirements:
+Clone this project using:
+
+```
+git clone https://github.com/espressif/esp-rainmaker-admin-cli.git
+```
+
+## Setup Build Environment
+
+> **Note**: If you are using esp-idf, the python and virtual environment requirement would already be fulfilled (via install.sh), and you can just install the dependencies using `python -m pip install -r requirements.txt` and move on to the next section which speaks about the [workflow](#workflow).
+
+### Operating System requirements
   - Linux / MacOS / Windows (standard distributions)
 
+### Other requirements
 To setup your build environment, please make sure you have the following installed on your host machine: 
-  - `python`   
-    (To install a specific python version please refer to the OS specific environment setup given below)
-  - `pip`    
-    (If not present, please refer to https://pip.pypa.io/en/stable/)
-  - `virtualenv`   
-    (You can install using command - `pip install virtualenv`)
+
+  - `python` (If not installed, please refer to https://www.python.org/)
+  - `pip` (If not present, please refer to https://pip.pypa.io/en/stable/)
+  - `virtualenv` (You can install using command - `pip install virtualenv`). This is not mandatory, but recommended so that rest of your python based utilities do not break.
 
 The following python versions are supported: 
-* python 2.7.x
-* python 3.5.x
-* python 3.6.x
-* python 3.7.x
-* python 3.8.x
 
-**OS specific environment setup**
+- python 3.5.x
+- python 3.6.x
+- python 3.7.x
+- python 3.8.x
 
->To setup environment for *MacOS*:
-1. Python setup:  
-    To install specific version please refer to https://www.python.org/downloads/  
-    Use your OS specific installer to install. Follow the default installation steps.     
-    Once installed, you should see the python version `<version>` installed in the following directory: 
-      `/Library/Frameworks/Python.framework/Versions/<version>`
-2. Go to directory where this CLI is present.
-3. To create virtualenv, run command: `virtualenv -p <python_version_path> venv1`
+### Installing dependencies
 
-      `<python_version_path>` for MacOS is: `/Library/Frameworks/Python.framework/Versions/<version>/Resources/Python.app/Contents/MacOS/Python`
-4. Run command to activate virtualenv: `source venv1/bin/activate`
-5. To install package requirements, run command `pip install -r requirements.txt`
-6. Once all packages are installed successfuly (you can verify using command - `pip list`), you can start using the CLI.
-7. To deactivate your virtualenv, run command `deactivate`
+Once python and pip are installed, set up the virtual environment by following the instructions [here](https://docs.python.org/3/library/venv.html). Thereafter, please enter the directory where this tool is installed (using terminal) and execute the below to install the dependencies:
 
->To setup environment for *Linux*:
-1. Python setup:  
-    To install specific version please refer to https://www.python.org/downloads/  
-    Use your OS specific installer to install. Follow the default installation steps.     
-    Once downloaded, untar the file.
-    Run the following commands to install:
-      - cd <untar_dir>
-      - ./configure --enable-optimizations
-      - make install  
-   You should see the python version `<version>` installed in the following directory: 
-      `/usr/local/bin/<version>`
+```
+pip install -r requirements.txt
+```
 
-2. Go to directory where this CLI is present.
-3. To create virtualenv, run command: `virtualenv -p <python_version_path> venv1`
-   
-      To know your `<python_version_path>` for Linux, run command `which python<version>`  
-      for eg. `which python3.7`, the output of the command is your `<python_version_path>`
-4. Run command to activate virtualenv: `source venv1/bin/activate`
-5. To install package requirements, run command `pip install -r requirements.txt`
-6. Once all packages are installed successfuly (you can verify using command - `pip list`), you can start using the CLI.
-7. To deactivate your virtualenv, run command `deactivate`.
+OR
 
->To setup environment for *Windows*:
-1. Python setup:  
-    To install specific version please refer to https://www.python.org/downloads/  
-    Use your OS specific installer to install. Follow the default installation steps.     
-    Once installed, you should see the python version `<version>` installed in the following directory:   
-      `C:\Users\<user>\AppData\Local\Programs\Python\<version>`  
-         **Note:** If you already have python2.7 installed, you may find it in path `C:\<version>`
+```
+python -m pip install -r requirements.txt
+```
 
-2. Go to directory where this CLI is present.
-3. To create virtualenv, run command: `virtualenv -p <python_version_path> venv1`
-   
-      `<python_version_path>` for Windows is: `C:\Users\<user>\AppData\Local\Programs\Python\<version>\python.exe`  
-         **Note:** For pre-installed python2.7, `<python_version_path>` will be `C:\<version>\python.exe`
-4. Run command to activate virtualenv: `\path\to\env\Scripts\activate.bat`
-5. To install package requirements, 
-   1. If you are using python version==2.7, please run commands in the following order:
-      - `pip install pyopenssl`
-      - `pip install -r requirements.txt`
-   2. If you are using any other python version, please run only the following command:
-      - `pip install -r requirements.txt`
-6. Once all packages are installed successfuly, you can start using the CLI.
-7. To deactivate your virtualenv, run command `deactivate`.
+## Workflow
 
-----------
+You need to perform the following steps to generate and register node credentials.
+To know more about the commands in detail, please refer the Usage section below.  
 
-**Workflow**
-=============
+1. Set Server Configuration:  
+`python rainmaker_admin_cli.py account serverconfig --endpoint <endpoint>`
+2. Login:  
+`python rainmaker_admin_cli.py account login --email <email_id>`
+3. Generate Device Certificate(s):
+`python rainmaker_admin_cli.py certs devicecert generate --count <count>`
+4. Register Generated Device Certificate(s):  
+`python rainmaker_admin_cli.py certs devicecert register --inputfile <inputfile>`
+5. Check Device Certificate Registration Status:   
+`python rainmaker_admin_cli.py certs devicecert getcertstatus --requestid <request_id>`
 
-You need to perform the following steps to use the Node Manufacturing Tool.  
-To know more about the commands, please refer to the Usage section below.  
+## Usage
 
-> 1. Set Server Configuration using command:  
-> `python rainmaker_admin_cli.py account serverconfig --endpoint <endpoint>`
-> 2. Login using command:  
-> `python rainmaker_admin_cli.py account login --email <email_id>`
-> 3. Generate Device Certificate(s) using command:
-> `python rainmaker_admin_cli.py certs devicecert generate --count <count>`
-> 4. Register Generated Device Certificate(s) using command:  
-> `python rainmaker_admin_cli.py certs devicecert register --inputfile <inputfile>`
-> 5. Check Device Certificate Registration Status using command:   
-> `python rainmaker_admin_cli.py certs devicecert getcertstatus --requestid <request_id>`
+To get help information for any RainMaker Admin CLI command or sub-command, you can use the -h option at various levels
 
-**Usage**
-============
+Eg.
 
-You can perform the following operations using the CLI.
+```
+python rainmaker_admin_cli.py -h
+python rainmaker_admin_cli.py account -h
+python rainmaker_admin_cli.py account login -h
+```
 
-        usage: rainmaker_admin_cli.py [-h] {account,certs} ...
+The Admin CLI commands are divided into 2 broad categories
 
-        ESP Rainmaker Admin CLI
+1. Account Operations
+2. Certificate Operations
 
-        optional arguments:
-        -h, --help       show this help message and exit
+**You need to setup the account before you can move on to the Certificate Operations**
 
-        Commands:
-        {account,certs}  usage: rainmaker_admin_cli.py {command} -h for additional help
-        account          Account Operations
-        certs            Certificate Operations
 
-**You need to set your server configuration and account configuration first in order to perform the manufacturing CLI operations. The CLI tool provides the *Account Operations* for the same.**
+### Account Operations
 
-**Account Operations**
-=======================
-        usage: rainmaker_admin_cli.py account [-h] {serverconfig,login} ...
+#### Server Config
 
-        optional arguments:
-        -h, --help            show this help message and exit
+You need to setup server configuration to get started. The endpoint would be your deployment's Base URL of the form `https://xxxx/amazonaws.com/dev` which you would have received on the super admin email configured during RainMaker deployment.
 
-        Commands:
-        {serverconfig,login}
-        serverconfig        Generate server configuration
-        login               Login using registered email-id
 
-   > **Set Server Config**
-   > ---------------------------
+Usage:
 
-   You need to setup server configuration to get started.
+`python rainmaker_admin_cli.py account serverconfig --endpoint <endpoint>`
 
->        usage: rainmaker_admin_cli.py account serverconfig [-h]
->                                                        [--endpoint <endpoint>]
->
->        optional arguments:
->        -h, --help            show this help message and exit
->        --endpoint <endpoint>
->                                Server endpoint to use for CLI Operations
->
-> **Example:**  
-> `python rainmaker_admin_cli.py account serverconfig --endpoint https://xxx/v0/`
+#### Login
 
-   > **Login**
-   > -------------------
-   You need to login to get started.
+You need to login to get started and use the subsequent APIs. The email id for login would be the super admin user email configured during RainMaker deployment. The password should have been already received on that email at the end of the backend deployment process.
 
->        usage: rainmaker_admin_cli.py account login [-h] [--email <emailid>]
->
->        optional arguments:
->        -h, --help         show this help message and exit
->        --email <emailid>  Registered email-id to login
->
-> **Example:**   
-> `python rainmaker_admin_cli.py account login --email abc@xyz.com`
 
-**Note:** Login configuration will be stored at location `~/.espressif/rainmaker/rainmaker_admin_config.json`
+Usage:
+  
+`python rainmaker_admin_cli.py account login --email <emailid>`
 
----------------
+> **Note**: Login configuration will be stored at location `~/.espressif/rainmaker/rainmaker_admin_config.json`
 
-**You can now perform manufacturing CLI operations once you have logged in successfully.**
 
--------------------
+**You can now use the rest of the commands once you have logged in successfully.**
 
-**Certs Operations**
-=======================
-        usage: rainmaker_admin_cli.py certs [-h] {cacert,devicecert} ...
 
-        optional arguments:
-        -h, --help           show this help message and exit
+### Device Certificate Operations
 
-        Commands:
-        {cacert,devicecert}
-        cacert             CA Certificate Operations
-        devicecert         Device Certificate Operations
-
-> **Device Certificate Operations**
-> ----------------------------------
-You can perform the following operations on the device certificate.
+You can perform the following operations for the device certificate.
 
 - `generate` - You can generate multiple device certificates at a time.  
 - `register` - You can register multiple generated device certificates.  
 - `getcertstatus` - Once you register the device certificates, you can check the device certificate registration status.
 
-        usage: rainmaker_admin_cli.py certs devicecert [-h]
-                                                {generate,register,getcertstatus}
-                                                ...
+#### Generate Device Certificates
 
-        optional arguments:
-        -h, --help            show this help message and exit
+This will generate the private keys and certificates required by the RainMaker nodes to connect to your deployment. It will also set other information like the node ids, mqtt endpoint, etc.
 
-        Commands:
-        {generate,register,getcertstatus}
-        generate            Generate device certificate(s)
-        register            Register device certificate(s)
-        getcertstatus       Check Device Certificate Registration Status
-
-> **Generate Device Certificate** 
-> --------------------------------
->         usage: rainmaker_admin_cli.py certs devicecert generate [-h]
->                                                               [--outdir <outdir>]
->                                                               [--count <count>]
->                                                               [--cacertfile <cacertfile>]
->                                                               [--cakeyfile <cakeyfile>]
->                                                               [--prov <prov_type>]
->                                                               [--fileid <fileid>]
+> Notes:
 >
->         optional arguments:
->         -h, --help            show this help message and exit
->         --outdir <outdir>     Path to output directory. Files generated will be saved in <outdir>
->                                 If directory does not exist, it will be created
->                                 Default: current directory
->         --count <count>       Number of Node Ids for generating certificates
->                                 Default: 0
->         --cacertfile <cacertfile>
->                                 Path to file containing CA Certificate
->         --cakeyfile <cakeyfile>
->                                 Path to file containing CA Private Key
->         --prov <prov_type>    Provisioning type to generate QR code
->                                 (softap/ble)
->         --fileid <fileid>     File identifier
->                                 Used to identify file for each node uniquely
->                                 Default: <node_id> (The node id's generated)
->                                 If provided, eg. `mac_addr`(MAC address),
->                                 must be part of ADDITIONAL_VALUES file (provided in config)
->                                 and must have <count> values in the file (for each node)
->
-> **Example:**   
-> `python rainmaker_admin_cli.py certs devicecert generate --count 2 --outdir test`
-**Note**: This command will also generate CA Certificate required for device certificates.
+> 1. This will also create the CA key and certificate that would be used for signing the device certificates. If you already have your own CA key and certificate, you can provide it explicitly.
+> 2. If you want the Provisioning QR codes to be generated as well, please use the --prov option, and pass appropriate transport. Generally, the default is "ble" for all chips that support BLE (ESP32, ESP32-C3) and "softap" for the ones that do not (ESP32-S2). However, this primarily depends on what you have used in your firmware.
 
-This command will generate the following files in `test` (`<outdir>`) directory:
+Usage:
+
+```
+python rainmaker_admin_cli.py certs devicecert generate [-h] [--outdir <outdir>] [--count <count>]
+                                                        [--cacertfile <cacertfile>] [--cakeyfile <cakeyfile>]
+                                                        [--prov <prov_type>] [--fileid <fileid>]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --outdir <outdir>     Path to output directory. Files generated will be saved in <outdir>
+                        If directory does not exist, it will be created
+                        Default: current directory
+  --count <count>       Number of Node Ids for generating certificates
+                        Default: 0
+  --cacertfile <cacertfile>
+                        Path to file containing CA Certificate
+  --cakeyfile <cakeyfile>
+                        Path to file containing CA Private Key
+  --prov <prov_type>    Provisioning type to generate QR code 
+                        (softap/ble)
+  --fileid <fileid>     File identifier 
+                        Used to identify file for each node uniquely (used as filename suffix)
+                        Default: <node_id> (The node id's generated)
+                        If provided, eg. `mac_addr`(MAC address),
+                        must be part of ADDITIONAL_VALUES file (provided in config)
+                        and must have <count> values in the file (for each node)
+```
+
+For simplest use case, the usage is as given below. If you want to add some custom data or customise some other parameters, please refer the subsequent sections.
+
+> Note that it is better to first create a small set of certificates, say 5, so that you get an idea about how the tool works.
+
+Example:
+`python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test`
+
+Sample result for 2 nodes is as below :
 
       test
       └── 2020-11-29
@@ -284,119 +204,94 @@ This command will generate the following files in `test` (`<outdir>`) directory:
                   ├── node-00001-T2uNDXPMS9nj9vpKjs2QG8.png
                   └── node-00002-dRagJ6GBim2HE5ENQ5nbYG.png
 
-The output directory will create the following sub-directory structure:  
-- `<outdir>/<current_date>/Mfg-<no>`: 
-  - Sub-directory with the current date is created.
-  - Each CLI command run for generating a device certificates batch, a `Mfg-<no>` sub-directory will be created where `<no>` is the number corresponding to the CLI run, `Mfg-00001` in this case. 
+The output directory will have the following sub-directory structure:
+
+- `<outdir>/<current_date>/Mfg-<no>`
+	- Sub-directory with the current date is created.
+  	- A `Mfg-<no>` sub-directory will be created where `<no>` is the batch number (which increments on each CLI run).
 
 The output directory contains the following files:
-1. `bin/`: For each device certificate, the corresponding NVS partition binaries are generated in this directory, which can be used to flash onto the device.
-                File format: `node-<index>-<node_id>.bin`
-        
-     - You can set the input parameters to generate the binary in the config file provided here: `config/binary_config.ini`
-     - You can provide `ADDITIONAL_CONFIG` and `ADDITIONAL_VALUES` file in the config.
-       - The format for `ADDITIONAL_CONFIG` file should be same as the `common/config.csv` file generated.
-       - The format for `ADDITIONAL_VALUES` file should be same as the `common/values.csv` file generated.
-       - This `ADDITIONAL_CONFIG` and `ADDITIONAL_VALUES` file contents will be part of the final binary generated.
 
-      **Note:** Sample files are provided in `samples/` directory.
-     
-     **Note:** The following dependent common files are generated in `common/` directory:
-      - `common/config.csv`  
-      - `common/values.csv`
-      - `common/endpoint.txt`
-      - `common/node_certs.csv`
-      - `common/node_ids.csv`
-
-2. `node_details/`: All node details are stored in this directory.   
+- `bin/`: For each device certificate, the corresponding NVS partition binaries are generated in this directory, which can be used to flash onto the device. File format: `node-<index>-<node_id>.bin`
+- `common/`: This has some common files that are generated during the process
+	- `ca.crt`: CA Certificate.
+	- `ca.key`: CA Key.
+	- `endpoint.txt`: MQTT Endpoint for this deployment.
+	- `node_certs.csv` : CSV for all the Node Certificates in this batch to be registered to the cloud.
+	- `node_ids.csv` : CSV for all node ids generated in this batch.
+	- `config.csv` : The NVS configuration file as per the format defined [here](https://github.com/espressif/esp-idf/tree/master/tools/mass_mfg#csv-configuration-file) for the IDF Manufacturing Utility.
+	- `values.csv` : Master file with all the values for all the nodes as per the format defined [here](https://github.com/espressif/esp-idf/tree/master/tools/mass_mfg#master-value-csv-file) for the IDF Manufacturing Utility.
+- `node_details/`: All node details are stored in this directory.   
    Following details for each node are stored in `node_details/node-<index>-<node_id>` directory:
-      1. Device Certificates: `node.crt`
-      2. Private key for each device certificate: `node.key`
-      3. The master csv file used as configuration to generate the binary: `node_info.csv`
-      4. The QR code payload (used during provisioning): `qrcode.txt`
-      5. The random string information (used as PoP): `random.txt`
-      6. Encryption key (if encryption is enabled in config): `node_encr_key.bin`
+	- `node.crt`: Device Certificates.
+	- `node.key`: Private key for each device certificate.
+	- `node_info.csv`: The csv file used as configuration to generate the binary.
+	- `qrcode.txt`: The QR code payload (used during provisioning, available only if --prov is given).
+	- `random.txt`: The random bytes information (used to generate device name and PoP, available only if --prov is given).
+	- `node_encr_key.bin`: Encryption key (if encryption is enabled in [config](config/binary_config.ini)).
 
-3. `test/qrcode/`: QR code images (used during provisioning) for all nodes is stored in this directory.
-                   File format: `node-<index>-<node_id>.png`
+- `qrcode/`: QR code images for all nodes are stored in this directory (used during provisioning, available only if --prov is given). File format: `node-<index>-<node_id>.png`
 
-> **Example:**   
-> `python rainmaker_admin_cli.py certs devicecert generate --count 2 --outdir test --cacertfile test2/ca_cert.crt --cakeyfile test2/ca_key.key`
+**Adding Custom Data**
 
-- Alongwith the output directory contents as mentioned above, this command will copy `--cacertfile` to `<outdir>/<current_date>/Mfg-<no>/common/ca.crt` and `--cakeyfile` to `<outdir>/<current_date>/Mfg-<no>/common/ca.key`.   
- So, `test2/ca_cert.crt` is copied to `test/2020-11-29/Mfg-00001/common/ca.crt` and `test2/ca_key.key` is copied to `test/2020-11-29/Mfg-00001/common/ca.key`. 
+There could often be a requirement to add some custom data to the nvs binaries generated. Such custom data can be added using the formats specified by the ESP IDF [Manufacturing Utility](https://github.com/espressif/esp-idf/tree/master/tools/mass_mfg). The [config file](https://github.com/espressif/esp-idf/tree/master/tools/mass_mfg#csv-configuration-file) and [values file](https://github.com/espressif/esp-idf/tree/master/tools/mass_mfg#master-value-csv-file) can be given as input by setting the `ADDITIONAL_CONFIG` and `ADDITIONAL_VALUES` fields in [config/binary_config.ini](config/binary_config.ini). Please check out samples for such files at [samples/extra_config.csv](samples/extra_config.csv) and [samples/extra_values.csv](samples/extra_values.csv)
+       
+#### Register Device Certificates
+
+Once the device certificates are generated, they also need to be registered with the cloud service using the register command.
+
+Usage:
+
+```
+python rainmaker_admin_cli.py certs devicecert register --inputfile <node_certs_file>
+```
+
+For the example in device certificate generation section the node_certs_file file would be `test/2020-11-29/Mfg-00001/common/node_certs.csv`.
+This command will give a request id in response, which can be used for monitoring the status.
+
+#### Check Device Certificate Registration Status
+
+The certificate registration process can take significant time. One it is finished, the super admin user will get an email with the status. The same can also be checked using the `getcertstatus` command.
+
+Usage:
+
+```
+python rainmaker_admin_cli.py certs devicecert getcertstatus --requestid XXXXXXX
+```
+
+Please check the output of the register command above to get the request id.
 
 
-**Note**: If you wish to generate CA Certificate separately, the following command is also provided.
-> **CA Certificate Operations**
-> ------------------------------
-You can generate CA Certificate on the host.
-> 3. Generate CA Certificate (if you do not have a CA Certificate generated on your host)  
-> `python rainmaker_admin_cli.py certs cacert generate`
->        usage: rainmaker_admin_cli.py certs cacert generate [-h] [--outdir <outdir>]
->
->        optional arguments:
->        -h, --help         show this help message and exit
->        --outdir <outdir>  Path to output directory. Files generated will be saved in <outdir>
->                           If directory does not exist, it will be created
->                           Default: current directory
->                           Certificate Filename: ca.crt
->                           Key Filename: ca.key
->
-> **Example:**  
-> `python rainmaker_admin_cli.py certs cacert generate --outdir test`
+### CA Certificate Operations
 
-Output files will be generated in *test* directory:
+The steps here would generally not be required. However, if you want to explicitly create a new CA certificate and use it for signing the device certificates, you can use this command.
 
-      test/
-      └── 2020-11-29
-         └── Mfg-00001
-             └── common
-                 └── ca.crt
-                 └── ca.key
+Usage:
 
-This command will generate the following files in `test` (`<outdir>`) directory:
-   1. `test/<current_date>/Mfg-<no>/common/ca.crt`: CA Certificate generated is stored in this file.  
-      `test/<current_date>/Mfg-<no>/common/ca.key`: Alongwith CA Certificate, CA Key is also generated. 
+```
+python rainmaker_admin_cli.py certs cacert generate --outdir <outdir>
+```
 
-> **Register Device Certificate**  
-> --------------------------------  
->
->        usage: rainmaker_admin_cli.py certs devicecert register [-h]
->                                                                [--inputfile <csvfilename>]
->
->        optional arguments:
->        -h, --help            show this help message and exit
->        --inputfile <csvfilename>
->                                Name of file containing node ids and certs
->
-> **Example:**  
-> `python rainmaker_admin_cli.py certs devicecert register --inputfile test/node_certs_20-08-05_12-40-41.csv`
+This will generate the CA key and certificate at following locations:
 
-> **Check Device Certificate Registration Status**   
-> ------------------------------------------------- 
->
->        usage: rainmaker_admin_cli.py certs devicecert getcertstatus
->        [-h] [--requestid <requestid>]
->
->        optional arguments:
->        -h, --help            show this help message and exit
->        --requestid <requestid>
->                                Request Id of device certificate registration
->
-> **Example:**  
-> `python rainmaker_admin_cli.py certs devicecert getcertstatus --requestid XXXXXXX`
+- `<outdir>/<current_date>/Mfg-<no>/common/ca.key` 
+- `<outdir>/<current_date>/Mfg-<no>/common/ca.crt`
 
-> **Flash Binary Onto Device**   
-> ------------------------------------------------- 
->
-> To flash binary generated onto the device, you can use the following command:
-> 
-> python esptool.py --port \<port\> write_flash 0x340000 \<outdir\>/bin/\<filename\>.bin`
+These can be used for signing the device certificates by passing these via the `--cacertfile` and `--cakeyfile` options for `rainmaker_admin_cli.py certs devicecert generate`
 
-------------
 
-**Resources**
-================
+
+### Flashing
+
+To flash binary generated onto the device, you can use the following command:
+
+```
+python esptool.py --port \<port\> write_flash <fctry_address> \<outdir\>/bin/\<filename\>.bin`
+```
+
+The <fctry_address> is typically 0x340000. However, please check your partition table to find the appropriate address.
+
+
+## Resources
 
 * Please get in touch with your ESP RainMaker contact in case of any issues or send an email to esp-rainmaker-support@espressif.com
