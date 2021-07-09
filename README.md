@@ -286,10 +286,12 @@ These can be used for signing the device certificates by passing these via the `
 To flash binary generated onto the device, you can use the following command:
 
 ```
-python esptool.py --port \<port\> write_flash <fctry_address> \<outdir\>/bin/\<filename\>.bin`
+esptool.py --port <port> write_flash <fctry_address> <outdir>/bin/<filename>.bin
 ```
 
-The <fctry_address> is typically 0x340000. However, please check your partition table to find the appropriate address.
+> Note: The `<fctry_address>` is typically 0x340000. However, please check your partition table to find the appropriate address.
+>
+> The esptool.py would be available in your PATH only if you have esp-idf set up, else, please find it at `esp-idf/components/esptool_py/esptool/esptool.py` and use from there.
 
 
 ## Resources
