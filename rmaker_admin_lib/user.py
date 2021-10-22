@@ -75,7 +75,7 @@ class User:
             log.debug("Password received")
 
             # Set HTTP Request
-            path = 'login/'
+            path = 'login2/'
             login_info = {
                 'user_name': self.__email,
                 'password': password
@@ -83,48 +83,58 @@ class User:
 
             login_url = constants.HOST.rstrip(backslash) + backslash + path
 
-            log.debug('Sending HTTP POST Request - login url:{} '
-                      'request body: {}'.format(
-                          login_url,
-                          json.dumps(login_info)))
+            # New user pool migration error code
+            migration_err_code = 101044
 
-            # Send HTTP POST Request
-            log.debug('Sending HTTP {} request - url: {} data: {} '
-                      'headers: {}'.format(
-                          'post',
-                          login_url,
-                          json.dumps(login_info),
-                          self.request_header))
+            while True:
+                log.debug('Sending HTTP POST Request - login url:{} '
+                        'request body: {}'.format(
+                            login_url,
+                            json.dumps(login_info)))
 
-            response = requests.post(url=login_url,
-                                     data=json.dumps(login_info),
-                                     headers=self.request_header,
-                                     verify=configmanager.CERT_FILE,
-                                     timeout=(5.0, 5.0))
+                # Send HTTP POST Request
+                log.debug('Sending HTTP {} request - url: {} data: {} '
+                        'headers: {}'.format(
+                            'post',
+                            login_url,
+                            json.dumps(login_info),
+                            self.request_header))
 
-            response = json.loads(response.text)
+                response = requests.post(url=login_url,
+                                        data=json.dumps(login_info),
+                                        headers=self.request_header,
+                                        verify=configmanager.CERT_FILE,
+                                        timeout=(5.0, 5.0))
 
-            log.debug("Response received: {}".format(response))
+                response = json.loads(response.text)
 
-            # Check response
-            if 'status' in response:
-                log.debug("Response status: {}".format(response['status']))
-                if 'success' in response['status']:
-                    for item in expected_resp:
-                        if item not in response:
-                            log.error('Expected response {} not found in '
-                                      'response: {}'.format(item, response))
-                            return False
+                log.debug("Response received: {}".format(response))
+
+                # Check response
+                if 'status' in response:
+                    log.debug("Response status: {}".format(response['status']))
+                    if 'success' in response['status']:
+                        for item in expected_resp:
+                            if item not in response:
+                                log.error('Expected response {} not found in '
+                                        'response: {}'.format(item, response))
+                                return False
+                            else:
+                                log.debug('Expected response {} received in '
+                                        'response: {}'.format(item, response))
+
+                        return response
+                    elif 'failure' in response['status']:
+                        if response['error_code'] == migration_err_code:
+                            log.debug('Received migration error code in reponse: {}\nPerforming user login operation again'.format(response))
+                            continue
                         else:
-                            log.debug('Expected response {} received in '
-                                      'response: {}'.format(item, response))
-
-                    return response
-                elif 'failure' in response['status']:
-                    log.info(response['description'])
-                    return False
+                            log.info(response['description'])
+                            return False
+                    else:
+                        log.debug("Login API HTTP status not in success/failure. Response received: {}".format(response))
+                        return False
                 else:
-                    log.debug("Login API HTTP status not in success/failure. Response received: {}".format(response))
                     return False
 
         except SSLError as ssl_err:
@@ -151,9 +161,8 @@ class User:
             log.debug("Extending user login session")
 
             # Set HTTP Request
-            path = 'login'
+            path = 'login2'
             request_payload = {
-                'user_name':  self.__email,
                 'refreshtoken': refresh_token
             }
 
