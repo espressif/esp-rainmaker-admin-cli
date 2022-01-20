@@ -316,6 +316,24 @@ COMMANDS = {
                 "metavar": "<csvfilename>",
                 "default": "",
                 "arghelp": "Name of file containing node ids and certs\n"
+            },
+                        {
+                "argname": "--groupname",
+                "metavar": "<nodegroupname>",
+                "default": "",
+                "arghelp": "Name of the group to which node are to be added after successful registration\n"
+            },
+                        {
+                "argname": "--type",
+                "metavar": "<nodetype>",
+                "default": "",
+                "arghelp": "Node type\n"
+            },
+                        {
+                "argname": "--model",
+                "metavar": "<nodemodel>",
+                "default": "",
+                "arghelp": "Node model\n"
             }
         ]
     },

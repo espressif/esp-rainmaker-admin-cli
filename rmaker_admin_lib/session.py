@@ -221,3 +221,29 @@ class Session:
                       'current user creds from config file'.format(err))
             raise Exception('Error: Failed to get '
                             'current user creds from config file'.format(err))
+
+    def get_refresh_token(self):
+        '''
+        Get Refresh Token
+        '''
+        try:
+            log.debug("Getting Refresh token")
+            config = Config()
+            config_data = config.read_config()
+            if not config_data:
+                log.info("User is not logged in. Please login to continue")
+                log.debug('User config data not found. '
+                          'Please login to continue')
+                return False
+            log.debug("Config data: {}".format(config_data))
+            if 'refreshtoken' not in config_data:
+                log.debug('Refresh Token not found in current login '
+                          'config data from '
+                          'file: {}'.format(config.config_file))
+                log.error('Please login to continue')
+                return False
+            refresh_token = config_data['refreshtoken']
+            return refresh_token
+        except Exception as err:
+            log.debug("Error while getting access token")
+            return False
