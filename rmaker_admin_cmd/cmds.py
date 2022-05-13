@@ -72,6 +72,9 @@ def _create_cnt_dir(curr_outdir):
     if not os.path.isdir(mfg_new_dirpath):
         os.makedirs(mfg_new_dirpath)
         log.debug("Directory created: {}".format(mfg_new_dirpath))
+    f= open(os.path.join(mfg_new_dirpath,".gitignore"),"w+")
+    f.write("*")
+    f.close()
     return mfg_new_dirpath
 
 def _print_keyboard_interrupt_message():
@@ -525,6 +528,10 @@ def register_device_cert(vars=None):
 
     :param vars: `inputfile` as key - Name of file containing
                                       node ids and device certificates
+                 `type` as key - Node Type
+                 `model` as key - Node Model
+                 `groupname` as key - Name of the group to which 
+                                      nodes are to be added
     :type vars: str
 
     :raises Exception: If there is any exception while
@@ -554,7 +561,10 @@ def register_device_cert(vars=None):
         if not token:
             log.error("Register device certificate failed")
             return
-
+        refresh_token = session.get_refresh_token()
+        if not refresh_token:
+            log.error("Register device certificate failed")
+            return
         # Get filename from input path
         basefilename = os.path.basename(vars['inputfile'])
         node_mfg = Node_Mfg(token)
@@ -574,9 +584,23 @@ def register_device_cert(vars=None):
 
         # Get MD5 Checksum for input file
         md5_checksum = _get_md5_checksum(vars['inputfile'])
-
+        node_type=vars['type']
+        node_model=vars['model']
+        group_name=vars['groupname']
+        if not node_type and not node_model and not group_name:
+            conti=True
+            log.warn("\nWARNING: type, model, group name are absent. ")
+            while conti:
+                goahead=input("Do you wish to continue? (y/n):")
+                if goahead=="y":
+                    conti=False
+                elif goahead=="n":
+                    log.info("You can provide type, model, group name using flags --type,--model, and --groupname.")
+                    return
+                else:
+                    log.error("Please enter a valid input.")
         # Register Device Certificate
-        request_id = node_mfg.register_cert_req(basefilename, md5_checksum)
+        request_id = node_mfg.register_cert_req(basefilename, md5_checksum, refresh_token, node_type, node_model, group_name)
         if not request_id:
             log.error("Request to register device certificate failed")
             return
