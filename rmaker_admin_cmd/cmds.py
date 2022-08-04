@@ -18,6 +18,7 @@ import sys
 import hashlib
 import datetime
 import traceback
+import csv
 import distutils.dir_util
 from rmaker_admin_lib.exceptions import FileError
 from rmaker_admin_lib.node_mfg import Node_Mfg
@@ -510,10 +511,24 @@ def _get_md5_checksum(filename):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
 
+def _remove_empty_lines(input_file):
+    #Remove empty lines if present from csv file
+    with open(input_file) as in_file:
+        with open("output_file.csv", 'w') as out_file:
+            writer = csv.writer(out_file)
+            for row in csv.reader(in_file):
+                if row:
+                    writer.writerow(row)
+    os.rename('output_file.csv',input_file)
+    return None
+
 def _check_file_type(input_file):
     header_str = "certs"
     cert_str = "BEGIN CERTIFICATE"
-    with open(input_file, 'r', newline='\n') as inputfile:
+
+    _remove_empty_lines(input_file)
+
+    with open(input_file, 'r', newline=None) as inputfile:
         header_data = inputfile.readline()
         if header_str in header_data:
             cert_data = inputfile.readline()
