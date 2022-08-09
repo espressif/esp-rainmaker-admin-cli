@@ -334,6 +334,18 @@ COMMANDS = {
                 "metavar": "<nodemodel>",
                 "default": "",
                 "arghelp": "Node model\n"
+            },
+                                    {
+                "argname": "--subtype",
+                "metavar": "<nodesubtype>",
+                "default": "",
+                "arghelp": "Node subtype\n"
+            },
+                       {
+                "argname": "--parent_groupname",
+                "metavar": "<parent_groupname>",
+                "default": "",
+                "arghelp": "Name of the parent group to which this newly created group will be a child group\n"
             }
         ]
     },

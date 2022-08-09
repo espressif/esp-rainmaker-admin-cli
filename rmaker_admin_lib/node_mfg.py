@@ -307,7 +307,72 @@ class Node_Mfg:
         except Exception as req_exc_err:
             raise Exception(req_exc_err)
 
-    def register_cert_req(self, filename, md5_checksum, refresh_token, node_type, model, group_name,
+    def validate_groupnames(self, group_name):
+        '''
+        GET API to validate the following things:
+        The parent groupname whether it exists or not and return parent group ID if the group is level 0 group
+        The groupname whether the it is level 0 group, if it exists
+
+        :param group_name: Group name to be validated
+        :type group_name: str
+        return values:
+        is_present: str 
+        group_id: str
+        '''
+        try:
+            backslash = '/'
+            log.info("Validating Group Names")
+
+            path = 'admin/node_group'
+            query_params = {'group_name': group_name}
+            request_url = constants.HOST.rstrip(backslash) + backslash + path
+            log.debug("Get admin node group - url: {} params: {}".format(
+                request_url,
+                query_params))
+
+            log.debug('Sending HTTP {} request - url: {} params: {} '
+                      'headers: {}'.format(
+                          'get',
+                          request_url,
+                          query_params,
+                          self.request_header))
+            # Send query params in HTTP GET Request
+            response = requests.get(url=request_url,
+                                    params=query_params,
+                                    headers=self.request_header,
+                                    verify=configmanager.CERT_FILE,
+                                    timeout=(5.0, 5.0))
+
+            log.debug("Response status code received: {}".format(
+                response.status_code))
+            response = json.loads(response.text)
+            log.debug("Response received: {}".format(response))
+            
+            if "status" in response:
+                if 'failure' in response['status']:
+                    log.debug('Request failed: '
+                         'Response received: {}'.format(response))
+                    return False,""
+
+            is_present = False
+            parent_group_id = ""
+            for group_response in response:
+                is_present = True
+                if "parent_group_id" in group_response:
+                    continue
+                elif "group_id" in group_response:
+                    parent_group_id = group_response["group_id"]
+            return is_present, parent_group_id
+        except SSLError as ssl_err:
+            log.error(ssl_err)
+        except NetworkError as net_err:
+            log.error(net_err)
+        except RequestTimeoutError as req_err:
+            log.error(req_err)
+        except Exception as req_exc_err:
+            raise Exception(req_exc_err)
+
+    def register_cert_req(self, filename, md5_checksum, refresh_token, node_type, model, group_name,parent_group_id,subtype,
                           expected_resp='request_id'):
         '''
         Request to register device certificates
@@ -336,6 +401,8 @@ class Node_Mfg:
                 'group_name': group_name,
                 'type': node_type,
                 'model': model,
+                'parent_group_id':parent_group_id,
+                'subtype':subtype
             }
             log.debug('Register Certificate Request - url: {} '
                       'req_body: {}'.format(request_url, request_body))

@@ -547,6 +547,8 @@ def register_device_cert(vars=None):
                  `model` as key - Node Model
                  `groupname` as key - Name of the group to which 
                                       nodes are to be added
+                 `parent_groupname` as key - Name of the parent group to which this newly created group will be a child group      
+                 `subtype` as key - Node SubType
     :type vars: str
 
     :raises Exception: If there is any exception while
@@ -583,6 +585,28 @@ def register_device_cert(vars=None):
         # Get filename from input path
         basefilename = os.path.basename(vars['inputfile'])
         node_mfg = Node_Mfg(token)
+
+        #Validate The groupname if the group is level 0 group if it exists
+        group_name=vars['groupname']
+        if group_name:
+            is_present, group_id = node_mfg.validate_groupnames(group_name)
+            if is_present and not group_id:
+                log.error("Invalid groupname as groupname should not be the subgroup/children group")
+                return
+
+        # validate parent groupname i.e to check if it exists and also check if it's level 0 group
+        parent_group_name = vars['parent_groupname']
+        parent_group_id = ""
+        if parent_group_name:
+            is_present, parent_group_id = node_mfg.validate_groupnames(parent_group_name)
+            if not is_present:
+                log.error("This parent group name does not exists.Please enter a valid parent group name.")
+                return
+            if not parent_group_id:
+                log.error("Invalid parent_groupname as parent_groupname should not be the subgroup/children group.")
+                return   
+
+
         # Get URL to upload Device Certificate to
         cert_upload_url = node_mfg.get_cert_upload_url(basefilename)
         if not cert_upload_url:
@@ -601,21 +625,23 @@ def register_device_cert(vars=None):
         md5_checksum = _get_md5_checksum(vars['inputfile'])
         node_type=vars['type']
         node_model=vars['model']
-        group_name=vars['groupname']
-        if not node_type and not node_model and not group_name:
+        subtype = vars['subtype']
+
+        if not node_type and not node_model and not group_name and not subtype and not parent_group_name:
             conti=True
-            log.warn("\nWARNING: type, model, group name are absent. ")
+            log.warn("\nWARNING: type, model, group name, subtype and parent groupname are absent.")
             while conti:
                 goahead=input("Do you wish to continue? (y/n):")
-                if goahead=="y":
+                if goahead=="y" or goahead=="Y":
                     conti=False
-                elif goahead=="n":
-                    log.info("You can provide type, model, group name using flags --type,--model, and --groupname.")
+                elif goahead=="n" or goahead=="N":
+                    log.info("You can provide type, model, group name , subtype and parent groupname using flags --type,--model,--groupname,--parent_groupname and --subtype. ")
                     return
                 else:
                     log.error("Please enter a valid input.")
+
         # Register Device Certificate
-        request_id = node_mfg.register_cert_req(basefilename, md5_checksum, refresh_token, node_type, node_model, group_name)
+        request_id = node_mfg.register_cert_req(basefilename, md5_checksum, refresh_token, node_type, node_model, group_name, parent_group_id, subtype)
         if not request_id:
             log.error("Request to register device certificate failed")
             return

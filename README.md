@@ -245,7 +245,7 @@ Usage:
 ```
 python rainmaker_admin_cli.py certs devicecert register [-h] --inputfile <csvfilename>
                                                         [--groupname <nodegroupname>] [--type <nodetype>]
-                                                        [--model <nodemodel>]
+                                                        [--model <nodemodel>] [--parent_groupname <parent_groupname>][--subtype <nodesubtype>]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -255,6 +255,9 @@ optional arguments:
                         Name of the group to which node are to be added after successful registration
   --type <nodetype>     Node type
   --model <nodemodel>   Node model
+  --parent_groupname <parent_groupname> 
+                        Name of the parent group to which this newly created group will be a child group      
+  --subtype <nodesubtype> Node SubType
 ```
 
 For the example in device certificate generation section the node_certs_file file would be `test/2020-11-29/Mfg-00001/common/node_certs.csv`.
