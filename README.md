@@ -243,7 +243,18 @@ Once the device certificates are generated, they also need to be registered with
 Usage:
 
 ```
-python rainmaker_admin_cli.py certs devicecert register --inputfile <node_certs_file>
+python rainmaker_admin_cli.py certs devicecert register [-h] --inputfile <csvfilename>
+                                                        [--groupname <nodegroupname>] [--type <nodetype>]
+                                                        [--model <nodemodel>]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --inputfile <csvfilename>
+                        Name of file containing node ids and certs
+  --groupname <nodegroupname>
+                        Name of the group to which node are to be added after successful registration
+  --type <nodetype>     Node type
+  --model <nodemodel>   Node model
 ```
 
 For the example in device certificate generation section the node_certs_file file would be `test/2020-11-29/Mfg-00001/common/node_certs.csv`.
