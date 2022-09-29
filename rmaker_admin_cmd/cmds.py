@@ -519,14 +519,22 @@ def _remove_empty_lines(input_file):
             for row in csv.reader(in_file):
                 if row:
                     writer.writerow(row)
+    # delete existing input_file before renaming
+    if os.path.exists(input_file):
+        os.remove(input_file)
     os.rename('output_file.csv',input_file)
     return None
 
 def _check_file_type(input_file):
     header_str = "certs"
     cert_str = "BEGIN CERTIFICATE"
+    
+    try:
+        _remove_empty_lines(input_file)
+    except Exception as e:
+        log.error("\nError Validating Input file.Please check the input file.")
+        return False
 
-    _remove_empty_lines(input_file)
 
     with open(input_file, 'r', newline=None) as inputfile:
         header_data = inputfile.readline()
