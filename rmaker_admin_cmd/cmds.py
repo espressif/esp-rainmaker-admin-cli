@@ -512,14 +512,14 @@ def _get_md5_checksum(filename):
     return hash_md5.hexdigest()
 
 def _remove_empty_lines(input_file):
-    #Remove empty lines if present from csv file
+    ##Remove empty lines if present from csv file
     with open(input_file) as in_file:
-        with open("output_file.csv", 'w') as out_file:
+        with open("output_file.csv", 'w', newline='') as out_file:
             writer = csv.writer(out_file)
             for row in csv.reader(in_file):
                 if row:
                     writer.writerow(row)
-    # delete existing input_file before renaming
+    ##delete existing input_file before renaming
     if os.path.exists(input_file):
         os.remove(input_file)
     os.rename('output_file.csv',input_file)
