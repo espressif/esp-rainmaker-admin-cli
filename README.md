@@ -246,6 +246,7 @@ Usage:
 python rainmaker_admin_cli.py certs devicecert register [-h] --inputfile <csvfilename>
                                                         [--groupname <nodegroupname>] [--type <nodetype>]
                                                         [--model <nodemodel>] [--parent_groupname <parent_groupname>][--subtype <nodesubtype>]
+                                                        [--tags <nodetags>]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -258,7 +259,9 @@ optional arguments:
   --parent_groupname <parent_groupname> 
                         Name of the parent group to which this newly created group will be a child group      
   --subtype <nodesubtype> Node SubType
+  --tags <nodetags> Comma separated strings of tags to be attached to the nodes.(eg: location:Pune,office:espressif)
 ```
+> Note that for adding tags, minimum rainmaker supported version is 1.1.27 
 
 For the example in device certificate generation section the node_certs_file file would be `test/2020-11-29/Mfg-00001/common/node_certs.csv`.
 This command will give a request id in response, which can be used for monitoring the status.
