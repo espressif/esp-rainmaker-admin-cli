@@ -18,6 +18,7 @@ import sys
 import hashlib
 import datetime
 import traceback
+import shortuuid
 import csv
 import distutils.dir_util
 from rmaker_admin_lib.exceptions import FileError
@@ -301,44 +302,91 @@ def _get_and_save_ca_cert_from_input(outdir, filepath):
     log.debug("CA Cert saved")
     return ca_cert
 
-def _set_data(node_count, common_outdir):
-    # Get current login session token
-    # Re-login if session expired
-    log.debug("Set data")
-    session = Session()
-    token = session.get_access_token()
-    if not token:
-        return None, None
+def _set_data(node_count, common_outdir, is_local, is_input_file):
 
-    node_mfg = Node_Mfg(token)
+    log.debug("Set data")
     log.debug('Generating node ids for '
                 'number of nodes: {}'.format(node_count))
-    # Generate <node_count> node ids
-    node_id_file_url = node_mfg.gen_node_id(node_count)
-    if not node_id_file_url:
-        log.error("Generate node ids failed")
-        return None, None
-    # Download node ids file from url
-    log.info("Downloading node ids file")
-    node_id_file_data = download_from_url(node_id_file_url)
-    if not node_id_file_data:
-        log.error("Download file from url failed")
-        return None, None
-    # Save node ids data received into a file
-    node_ids_file = save_to_file(node_id_file_data, common_outdir,
+    node_ids_file = ""
+    
+    if not is_input_file:
+        if is_local:
+            # Generate <node_count> node ids
+            log.debug("Locally generate node Ids")
+            node_id_file_data = gen_node_id_local(node_count)
+            if not node_id_file_data:
+                log.error("Error generating node Ids locally")
+                return None, None
+            node_mfg = Node_Mfg(None)
+            node_id_file_data = gen_node_id_local(node_count)
+            if not node_id_file_data:
+                log.error("Error generating node Ids locally")
+                return None, None
+        else:
+            # Get current login session token
+            # Re-login if session expired
+            session = Session()
+            token = session.get_access_token()
+            if not token:
+                return None, None
+            node_mfg = Node_Mfg(token)
+            # Generate <node_count> node ids
+            node_id_file_url = node_mfg.gen_node_id(node_count)
+            if not node_id_file_url:
+                log.error("Generate node ids failed")
+                return None, None
+            # Download node ids file from url
+            log.info("Downloading node ids file")
+            node_id_file_data = download_from_url(node_id_file_url)
+    
+            if not node_id_file_data:
+                log.error("Download file from url failed")
+                return None, None
+
+        # Save node ids data received into a file
+        node_ids_file = save_to_file(node_id_file_data, common_outdir,
                                  filename_prefix="node_ids")
-    if not node_ids_file:
-        return None, None
-    log.info("Node ids file saved at location: {}".format(node_ids_file))
+        if not node_ids_file:
+            return None, None
+        log.info("Node ids file saved at location: {}".format(node_ids_file))
+    else:
+        node_mfg = Node_Mfg(None)
+        is_local = True
 
     # Save mqtt endpoint into a file
-    endpoint = node_mfg.get_mqtthostname()
+    endpoint = node_mfg.get_mqtthostname(is_local)
     endpoint_file = save_to_file(endpoint, common_outdir,
                                  dest_filename=MQTT_ENDPOINT_FILENAME)
     if not endpoint_file:
         return None, None
     log.info("Endpoint saved at location: {}".format(endpoint_file))    
     return node_ids_file, endpoint_file
+
+def gen_node_id_local(node_count):
+    '''
+    Generate list of node ids
+
+    :param node_cnt: Number of node ids to get
+    :type node_cnt: int
+    '''
+    try:
+        log.debug('Generating node ids locally: {}'.format(node_count))
+
+        node_list = []
+        
+        # Using shortuuid to generate node_ids in consistent with rainmaker node_ids
+        for i in range(node_count):
+            node_list.append(shortuuid.uuid())
+        log.info('Request for generating node ids: {} is successful'.format(node_count))
+
+        return ",".join(node_list)
+    except KeyboardInterrupt:
+        log.error("\nGenerate node Ids failed")
+    except Exception as err:
+        log.error("Generate node Ids failed")
+        if len(str(err)) > 0:
+            log.error("Error: {}".format(err))
+
 
 def _extra_config_files_checks(outdir, extra_config, extra_values, file_id):
     log.debug("Extra config file checks")
@@ -409,6 +457,12 @@ def generate_device_cert(vars=None):
                        Device Certificate(s)
             KeyboardInterrupt: If there is a keyboard interrupt by user
 
+    :param vars: `local` as key - This is to determine whether or not to generate node ids locally
+    :type vars: bool
+
+    :param vars: `inputfile` as key - This is the node_ids.csv file containing pre-generated node ids
+    :type vars: str
+
     :return: None on Failure
     :rtype: None
     '''
@@ -449,6 +503,23 @@ def generate_device_cert(vars=None):
         
         # Create output directory for all common files generated
         common_outdir = _gen_common_files_dir(outdir)
+
+        # If local = true we will generate node Ids locally
+        is_local = vars["local"]
+        if not is_local:
+            is_local = False
+        
+        is_node_id_file = False
+        node_id_list_unique = []
+        input_node_ids_file = vars["inputfile"]
+        if input_node_ids_file:
+            # Validate node_ids.csv file by trying to get node Ids from the file
+            node_id_list = get_nodeid_from_file(input_node_ids_file)
+            if not node_id_list:
+                log.error("Node Ids not found in the input file : {}".format(input_node_ids_file))
+                raise Exception("Invalid Input file.")
+            node_id_list_unique = [*set(node_id_list)]
+            is_node_id_file = True
         
         # Generate CA Cert and CA Key
         ca_cert_filepath = vars['cacertfile']
@@ -472,8 +543,9 @@ def generate_device_cert(vars=None):
         # Get and save CA Private Key from file
         if len(ca_key_filepath) != 0:
             ca_private_key = _get_and_save_ca_key_from_input(common_outdir, ca_key_filepath)
-        # Set data
-        node_ids_file, endpoint_file = _set_data(node_count, common_outdir)
+        node_ids_file, endpoint_file = _set_data(node_count, common_outdir, is_local, is_node_id_file)
+        if is_node_id_file:
+            node_ids_file = input_node_ids_file
         if not node_ids_file and not endpoint_file:
             raise Exception("")
         # Generate Device Cert and save into file
@@ -483,7 +555,7 @@ def generate_device_cert(vars=None):
                                                  file_id,
                                                  outdir,
                                                  endpoint_file,
-                                                 prov_type)
+                                                 prov_type, node_id_list_unique)
         if not certs_dest_filename:
             log.error("Generate device certificate failed")
             return

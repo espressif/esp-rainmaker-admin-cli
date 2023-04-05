@@ -513,7 +513,7 @@ class Node_Mfg:
         except Exception as req_exc_err:
             raise Exception(req_exc_err)
 
-    def get_mqtthostname(self):
+    def get_mqtthostname(self,is_local):
         '''
         Get MQTT Hostname
         '''
@@ -521,8 +521,15 @@ class Node_Mfg:
             backslash = '/'
             log.info("Sending request to get mqtt endpoint")
             retry_cnt = MAX_HTTP_CONNECTION_RETRIES
-            path = 'admin/mqtt_host'
-            request_url = constants.HOST.rstrip(backslash) + backslash + path
+            #If is_local is true or input node_ids.cs file is given, we get MQTT endpoint via unauthenticated API.
+            if is_local:
+                path = 'mqtt_host'
+                host = constants.API_URL
+            else:
+                path = 'admin/mqtt_host'
+                host = constants.HOST
+
+            request_url = host.rstrip(backslash) + backslash + path
             log.debug("Get MQTT hostname - url: {}".format(request_url))
 
             while retry_cnt > 0:

@@ -10,6 +10,7 @@ try:
         backslash = '/'
         VERSION = 'v1'
         HOST = serverconfig.BASE_URL.rstrip(backslash) + backslash + VERSION + backslash
+        API_URL = serverconfig.BASE_URL.rstrip(backslash)
 
 except Exception as e:
     log.debug(e)
