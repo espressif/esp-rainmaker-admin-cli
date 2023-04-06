@@ -26,6 +26,8 @@ import pyqrcode
 import distutils.dir_util
 from tools import mfg_gen
 from rmaker_admin_lib.logger import log
+from dateutil.relativedelta import relativedelta
+
 try:
     from future.moves.itertools import zip_longest
     from cryptography import x509
@@ -49,6 +51,7 @@ MFG_CONFIG_FILENAME = "config.csv"
 MFG_VALUES_FILENAME = "values.csv"
 MFG_BINARY_CONFIG_FILENAME = "config{}binary_config.ini".format(path_sep)
 MQTT_ENDPOINT_FILENAME = "endpoint.txt"
+CERT_VALIDATION_YEARS = 100
 
 # Set input arguments required by manufacturing tool
 # for creating NVS Partition Binary
@@ -442,9 +445,9 @@ def _generate_cert(subject_name=None, issuer_name=None,
     :type ca: bool
     '''
     try:
-        # Fixed date set to activate certificate generated immediately
-        # 1st July, 2020 (2020-07-01 00:00:00)
-        valid_from_date = datetime.datetime(2020, 7, 1, 00, 00, 00)
+        # Setting start date to previous day to activate generated certificates immediately
+        valid_from_date = datetime.datetime.today() - datetime.timedelta(days=1)
+
         log.debug('Generating certificate builder - subject_name:{} '
                   'issuer_name: {} ca: {}'.format(
                       subject_name,
@@ -453,10 +456,10 @@ def _generate_cert(subject_name=None, issuer_name=None,
         builder = x509.CertificateBuilder()
         builder = builder.subject_name(x509.Name(subject_name))
         builder = builder.issuer_name(x509.Name(issuer_name))
-        ten_years = datetime.timedelta(3650, 0, 0)
+        cert_validation_period = relativedelta(years=CERT_VALIDATION_YEARS)
         builder = builder.not_valid_before(valid_from_date)
         builder = builder.not_valid_after(
-            valid_from_date + ten_years)
+            valid_from_date + cert_validation_period)
         builder = builder.serial_number(x509.random_serial_number())
 
         builder = builder.public_key(public_key)
