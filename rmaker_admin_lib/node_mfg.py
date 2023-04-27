@@ -14,6 +14,7 @@
 
 
 import json
+import re
 import time
 import sys
 import datetime
@@ -34,7 +35,10 @@ except ImportError as err:
 from rmaker_admin_lib import constants
 
 MAX_HTTP_CONNECTION_RETRIES = 5
-
+TAG_REGEX = "^ *[a-zA-Z_.0-9]+ *: *[a-zA-Z_.0-9]+ *$"
+COLON = ":"
+EMPTY_STRING = ""
+COMMA = ","
 
 class Node_Mfg:
     """
@@ -309,7 +313,7 @@ class Node_Mfg:
 
     def validate_groupnames(self, group_name):
         '''
-        GET API to validate the following things:
+        API to validate the following things:
         The parent groupname whether it exists or not and return parent group ID if the group is level 0 group
         The groupname whether the it is level 0 group, if it exists
 
@@ -372,7 +376,36 @@ class Node_Mfg:
         except Exception as req_exc_err:
             raise Exception(req_exc_err)
 
-    def register_cert_req(self, filename, md5_checksum, refresh_token, node_type, model, group_name,parent_group_id,subtype,
+    def validate_tags(self, tags):
+        '''
+        This function will validate the tags and return true and false accordingly.It also trims the whitespaces if any
+        :param tags: The comma separated string of tags  
+        :type tags: str
+        return values:
+        is_valid: bool
+        tags: string
+        '''
+        try:
+            log.info("Validating Tags")
+            tags_array = tags.split(",")
+
+            if len(tags_array)<1:
+                return False, EMPTY_STRING
+
+            for tag in tags_array:
+                regexMatch = re.search(TAG_REGEX, tag)
+                if regexMatch:
+                    splitArray = tag.split(":")
+                    if len(splitArray) == 2 :
+                        tag = tag.strip(splitArray[0]) + ":" + tag.strip(splitArray[1])
+                else:
+                    return False, EMPTY_STRING
+            
+            return True, COMMA.join(tags_array)
+        except Exception as exeption_validating_tags:
+            log.error(exeption_validating_tags)
+
+    def register_cert_req(self, filename, md5_checksum, refresh_token, node_type, model, group_name,parent_group_id,subtype,tags,
                           expected_resp='request_id'):
         '''
         Request to register device certificates
@@ -402,7 +435,8 @@ class Node_Mfg:
                 'type': node_type,
                 'model': model,
                 'parent_group_id':parent_group_id,
-                'subtype':subtype
+                'subtype':subtype,
+                'tags':tags,
             }
             log.debug('Register Certificate Request - url: {} '
                       'req_body: {}'.format(request_url, request_body))

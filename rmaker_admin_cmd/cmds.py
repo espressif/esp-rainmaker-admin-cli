@@ -557,6 +557,7 @@ def register_device_cert(vars=None):
                                       nodes are to be added
                  `parent_groupname` as key - Name of the parent group to which this newly created group will be a child group      
                  `subtype` as key - Node SubType
+                 `tags` as key - Comma separated strings of tags to be attached to the nodes.(eg: location:Pune,office:espressif)
     :type vars: str
 
     :raises Exception: If there is any exception while
@@ -613,7 +614,14 @@ def register_device_cert(vars=None):
             if not parent_group_id:
                 log.error("Invalid parent_groupname as parent_groupname should not be the subgroup/children group.")
                 return   
-
+                #Validate The groupname if the group is level 0 group if it exists
+        #validate tags if present        
+        tags=vars['tags']
+        if tags:
+            is_valid, tags = node_mfg.validate_tags(tags)
+            if not is_valid :
+                log.error("Invalid tags, Please specify valid tags in the comma separated string format eg: location:Pune,office:espressif ")
+                return
 
         # Get URL to upload Device Certificate to
         cert_upload_url = node_mfg.get_cert_upload_url(basefilename)
@@ -635,21 +643,21 @@ def register_device_cert(vars=None):
         node_model=vars['model']
         subtype = vars['subtype']
 
-        if not node_type and not node_model and not group_name and not subtype and not parent_group_name:
+        if not node_type and not node_model and not group_name and not subtype and not parent_group_name and not tags:
             conti=True
-            log.warn("\nWARNING: type, model, group name, subtype and parent groupname are absent.")
+            log.warn("\nWARNING: type, model, group name, subtype, tags and parent groupname are absent.")
             while conti:
                 goahead=input("Do you wish to continue? (y/n):")
                 if goahead=="y" or goahead=="Y":
                     conti=False
                 elif goahead=="n" or goahead=="N":
-                    log.info("You can provide type, model, group name , subtype and parent groupname using flags --type,--model,--groupname,--parent_groupname and --subtype. ")
+                    log.info("You can provide type, model, group name , subtype, parent groupname and tags using flags --type,--model,--groupname,--subtype,--parent_groupname,--tags. ")
                     return
                 else:
                     log.error("Please enter a valid input.")
 
         # Register Device Certificate
-        request_id = node_mfg.register_cert_req(basefilename, md5_checksum, refresh_token, node_type, node_model, group_name, parent_group_id, subtype)
+        request_id = node_mfg.register_cert_req(basefilename, md5_checksum, refresh_token, node_type, node_model, group_name, parent_group_id, subtype, tags)
         if not request_id:
             log.error("Request to register device certificate failed")
             return

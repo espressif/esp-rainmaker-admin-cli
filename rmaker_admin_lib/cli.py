@@ -346,6 +346,12 @@ COMMANDS = {
                 "metavar": "<parent_groupname>",
                 "default": "",
                 "arghelp": "Name of the parent group to which this newly created group will be a child group\n"
+            },
+                                   {
+                "argname": "--tags",
+                "metavar": "<node_tags>",
+                "default": "",
+                "arghelp": "Comma separated strings of tags to be attached to the nodes\n"
             }
         ]
     },
