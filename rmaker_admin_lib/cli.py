@@ -303,7 +303,20 @@ COMMANDS = {
                            'If provided, eg. `mac_addr`(MAC address),\n'
                            'must be part of ADDITIONAL_VALUES file (provided in config)\n'
                            'and must have <count> values in the file (for each node)\n'
-            }
+            },
+            {
+                "argname": "--local",
+                "metavar": "<local>",
+                "default": "",
+                "arghelp": 'This is to determine whether or not to generate node ids locally\n'
+                           'Default: true\n'
+            },
+            {
+                "argname": "--inputfile",
+                "metavar": "<inputfile>",
+                "default": "",
+                "arghelp": 'This is the node_ids.csv file containing pre-generated node ids\n'
+            },           
         ]
     },
     "devicecert_register": {

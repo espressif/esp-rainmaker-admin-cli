@@ -1012,7 +1012,7 @@ def _certs_files_init(dest_filename):
     return dest_csv_file
 
 def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
-                       file_id, outdir, endpoint_file, prov_type):
+                       file_id, outdir, endpoint_file, prov_type, node_id_list_unique):
     '''
     Generate and save device certificate
 
@@ -1067,11 +1067,15 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
         log.info("QR code image(png) will be saved at location: {}".format(qrcode_outdir))
         log.info("\nGenerating device certificates")
         
-        # Get Node Ids list from file
-        node_id_list = get_nodeid_from_file(input_filename)
-        if not node_id_list:
-            print("Node ids not found in file: {}".format(input_filename))
-            return False
+        # If node_id_list is already calculated in case of input file
+        if node_id_list_unique:
+            node_id_list = node_id_list_unique
+        else:
+            # Get Node Ids list from file
+            node_id_list = get_nodeid_from_file(input_filename)
+            if not node_id_list:
+                print("Node ids not found in file: {}".format(input_filename))
+                return False
         node_id_list = [i for i in node_id_list if i]
 
         # Generate and save cert for each node id

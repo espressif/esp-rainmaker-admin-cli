@@ -142,6 +142,7 @@ Usage:
 python rainmaker_admin_cli.py certs devicecert generate [-h] [--outdir <outdir>] [--count <count>]
                                                         [--cacertfile <cacertfile>] [--cakeyfile <cakeyfile>]
                                                         [--prov <prov_type>] [--fileid <fileid>]
+                                                        [--local <local>] [--inputfile <inputfile>]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -162,14 +163,25 @@ optional arguments:
                         If provided, eg. `mac_addr`(MAC address),
                         must be part of ADDITIONAL_VALUES file (provided in config)
                         and must have <count> values in the file (for each node)
+  --local <local>       This is to determine whether or not to generate node ids locally.
+                        Default: false
+  --inputfile <csvfile> This is the node_ids.csv file containing pre-generated node ids.
 ```
+
+For generating the node Ids locally without the rainmaker login:
+`python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test --local true`
+
+For generating the node certificates by providing pre-generated node ids csv file:
+`python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test --local true --inputfile <node_ids.csv>`
+> Note that in this command, count and local argument will be ignored and inputfile will get the precendence.
+
 
 For simplest use case, the usage is as given below. If you want to add some custom data or customise some other parameters, please refer the subsequent sections.
 
 > Note that it is better to first create a small set of certificates, say 5, so that you get an idea about how the tool works.
 
 Example:
-`python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test`
+`python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test --local true --inputfile <node_ids.csv>`
 
 Sample result for 2 nodes is as below :
 

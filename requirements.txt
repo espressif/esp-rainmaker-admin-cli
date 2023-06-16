@@ -5,3 +5,4 @@ configparser>=4.0.0,<5.0.0
 pyqrcode
 pypng==0.0.20
 python-dateutil
+shortuuid
