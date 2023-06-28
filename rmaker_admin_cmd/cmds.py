@@ -31,6 +31,7 @@ from rmaker_admin_lib.logger import log
 from rmaker_admin_lib.user import User
 from rmaker_admin_lib.session import Session
 from rmaker_admin_lib.configmanager import SERVER_CONFIG_FILE
+from rmaker_admin_lib.csv_validator import CsvValidator
 try:
     from future.utils import iteritems
     from builtins import input, str
@@ -687,14 +688,18 @@ def register_device_cert(vars=None):
                 log.error("Invalid parent_groupname as parent_groupname should not be the subgroup/children group.")
                 return   
                 #Validate The groupname if the group is level 0 group if it exists
-        #validate tags if present        
-        tags=vars['tags']
-        if tags:
-            is_valid, tags = node_mfg.validate_tags(tags)
-            if not is_valid :
-                log.error("Invalid tags, Please specify valid tags in the comma separated string format eg: location:Pune,office:espressif ")
-                return
 
+        # Validate tags if present
+        tags = vars['tags']
+        if tags:
+            # Validations for the CSV file and tags
+            csvValidator = CsvValidator(vars['inputfile'])
+            tags = csvValidator.are_valid(tags)
+            if not tags:
+                log.error(
+                    "Error ocurred while validating the tags and the csv file.")
+                return
+            
         # Get URL to upload Device Certificate to
         cert_upload_url = node_mfg.get_cert_upload_url(basefilename)
         if not cert_upload_url:

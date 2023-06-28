@@ -254,7 +254,7 @@ Once the device certificates are generated, they also need to be registered with
 
 Usage:
 
-```
+```sh
 python rainmaker_admin_cli.py certs devicecert register [-h] --inputfile <csvfilename>
                                                         [--groupname <nodegroupname>] [--type <nodetype>]
                                                         [--model <nodemodel>] [--parent_groupname <parent_groupname>][--subtype <nodesubtype>]
@@ -273,10 +273,30 @@ optional arguments:
   --subtype <nodesubtype> Node SubType
   --tags <nodetags> Comma separated strings of tags to be attached to the nodes.(eg: location:Pune,office:espressif)
 ```
-> Note that for adding tags, minimum rainmaker supported version is 1.1.27 
 
 For the example in device certificate generation section the node_certs_file file would be `test/2020-11-29/Mfg-00001/common/node_certs.csv`.
 This command will give a request id in response, which can be used for monitoring the status.
+
+##### Adding Tags
+
+Basic Tags can be added to nodes using the `--tags` option. Using `--tags loc:Amsterdam` will add this same tag to all the nodes in `node_certs.csv`.  
+> Note that for adding tags, minimum rainmaker supported version is 1.1.27.  
+
+If different tag values are to be used for each node in the `node_certs.csv` file, use `--tags loc:@city`, where `city` should be a column in the `node_certs.csv`.
+
+For example:  
+node_certs.csv:
+| node_id | certs | city      |
+| ------- | ----- | --------- |
+| node1   | cert1 | Amsterdam |
+| node2   | cert2 | Barcelona |
+
+After passing `--tags loc:@city`,
+
+- node1 will get the tag: `loc:Amsterdam`.
+- node2 will get the tag: `loc:Barcelona`.
+
+> To use CSV based tags, i.e `city:@loc` where *loc* is a column in the CSV, the minimum rainmaker supported version is 1.1.28.
 
 #### Check Device Certificate Registration Status
 
