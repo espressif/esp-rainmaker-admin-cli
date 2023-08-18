@@ -555,9 +555,7 @@ def generate_cacert(cacert_info, ca_private_key):
         subj_name_list = _create_subj_name_list(cacert_info)
         if not subj_name_list:
             return False
-        issuer_name = [x509.NameAttribute(
-            NameOID.COMMON_NAME,
-            cacert_info['common_name'])]
+        issuer_name = subj_name_list
         ca_cert = _generate_cert(
             subject_name=subj_name_list,
             issuer_name=issuer_name,
