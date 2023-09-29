@@ -668,36 +668,35 @@ def register_device_cert(vars=None):
         basefilename = os.path.basename(vars['inputfile'])
         node_mfg = Node_Mfg(token)
 
-        #Validate The groupname if the group is level 0 group if it exists
-        group_name=vars['groupname']
-        if group_name:
-            is_present, group_id = node_mfg.validate_groupnames(group_name)
-            if is_present and not group_id:
-                log.error("Invalid groupname as groupname should not be the subgroup/children group")
-                return
-
         # validate parent groupname i.e to check if it exists and also check if it's level 0 group
         parent_group_name = vars['parent_groupname']
+        group_name=vars['groupname']
+
         parent_group_id = ""
         if parent_group_name:
-            is_present, parent_group_id = node_mfg.validate_groupnames(parent_group_name)
-            if not is_present:
-                log.error("This parent group name does not exists.Please enter a valid parent group name.")
+            if group_name == parent_group_name:
+                log.error("Groupname and parent_groupname should not be same")
                 return
-            if not parent_group_id:
+            is_present, parent_group_id = node_mfg.validate_groupnames(parent_group_name, parent_group_id)
+            if is_present and not parent_group_id:
                 log.error("Invalid parent_groupname as parent_groupname should not be the subgroup/children group.")
-                return   
-                #Validate The groupname if the group is level 0 group if it exists
+                return
 
-        # Validate tags if present
-        tags = vars['tags']
+        #Validate The groupname if the group is level 0 group if it exists
+        if group_name:
+            is_present, group_id = node_mfg.validate_groupnames(group_name, parent_group_id)
+            if is_present and not group_id:
+                log.error("Either provide the groupname with no parent or subgroup along with it's parent groupname")
+                return
+            
+        #validate tags if present        
+        tags=vars['tags']
         if tags:
             # Validations for the CSV file and tags
             csvValidator = CsvValidator(vars['inputfile'])
             tags = csvValidator.are_valid(tags)
             if not tags:
-                log.error(
-                    "Error ocurred while validating the tags and the csv file.")
+                log.error("Error ocurred while validating the tags and the csv file.")
                 return
             
         # Get URL to upload Device Certificate to
@@ -734,7 +733,7 @@ def register_device_cert(vars=None):
                     log.error("Please enter a valid input.")
 
         # Register Device Certificate
-        request_id = node_mfg.register_cert_req(basefilename, md5_checksum, refresh_token, node_type, node_model, group_name, parent_group_id, subtype, tags)
+        request_id = node_mfg.register_cert_req(basefilename, md5_checksum, refresh_token, node_type, node_model, group_name, parent_group_id, parent_group_name, subtype, tags)
         if not request_id:
             log.error("Request to register device certificate failed")
             return

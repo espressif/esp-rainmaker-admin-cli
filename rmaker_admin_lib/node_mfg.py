@@ -309,14 +309,16 @@ class Node_Mfg:
         except Exception as req_exc_err:
             raise Exception(req_exc_err)
 
-    def validate_groupnames(self, group_name):
+    def validate_groupnames(self, group_name, parent_group_id):
         '''
         API to validate the following things:
-        The parent groupname whether it exists or not and return parent group ID if the group is level 0 group
-        The groupname whether the it is level 0 group, if it exists
+        Parent group (if provided) is level 0 group, if it exists.
+        Group is level 0 group if no parent group is provided.
 
         :param group_name: Group name to be validated
         :type group_name: str
+        :param parent_group_id: parent_group_id
+        :type parent_group_id: str
         return values:
         is_present: str 
         group_id: str
@@ -357,14 +359,19 @@ class Node_Mfg:
                     return False, ""
 
             is_present = False
-            parent_group_id = ""
+            group_id = ""
+            subGroupId = ""
             for group_response in response:
                 is_present = True
                 if "parent_group_id" in group_response:
-                    continue
+                    parentId = group_response["parent_group_id"]
+                    if parent_group_id and parent_group_id == parentId:
+                        subGroupId = group_response["group_id"]
                 elif "group_id" in group_response:
-                    parent_group_id = group_response["group_id"]
-            return is_present, parent_group_id
+                    group_id = group_response["group_id"]
+            if subGroupId:
+                 group_id = subGroupId
+            return is_present, group_id
         except SSLError as ssl_err:
             log.error(ssl_err)
         except NetworkError as net_err:
@@ -374,7 +381,7 @@ class Node_Mfg:
         except Exception as req_exc_err:
             raise Exception(req_exc_err)
 
-    def register_cert_req(self, filename, md5_checksum, refresh_token, node_type, model, group_name, parent_group_id, subtype, tags,
+    def register_cert_req(self, filename, md5_checksum, refresh_token, node_type, model, group_name,parent_group_id,parent_group_name,subtype,tags,
                           expected_resp='request_id'):
         '''
         Request to register device certificates
@@ -403,9 +410,10 @@ class Node_Mfg:
                 'group_name': group_name,
                 'type': node_type,
                 'model': model,
-                'parent_group_id': parent_group_id,
-                'subtype': subtype,
-                'tags': tags,
+                'parent_group_id':parent_group_id,
+                'parent_group_name':parent_group_name,
+                'subtype':subtype,
+                'tags':tags,
             }
             log.debug('Register Certificate Request - url: {} '
                       'req_body: {}'.format(request_url, request_body))
