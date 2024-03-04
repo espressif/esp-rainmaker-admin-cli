@@ -184,6 +184,11 @@ class ArgParser():
                                     default=arg["default"],
                                     help=arg["arghelp"],
                                     choices=arg["choices"])
+            elif 'action' in arg.keys():
+                parser.add_argument(arg["argname"],
+                                    default=arg["default"],
+                                    help=arg["arghelp"],
+                                    action=arg["action"])
             else:
                 parser.add_argument(arg["argname"],
                                     metavar=arg["metavar"],
@@ -307,10 +312,9 @@ COMMANDS = {
             },
             {
                 "argname": "--local",
-                "metavar": "<local>",
-                "default": "",
-                "arghelp": 'This is to determine whether or not to generate node ids locally\n'
-                           'Default: true\n'
+                "action":"store_true",
+                "default": False,
+                "arghelp": 'This is to determine whether to generate node ids locally\n'       
             },
             {
                 "argname": "--inputfile",
@@ -379,6 +383,12 @@ COMMANDS = {
                 "metavar": "<node_tags>",
                 "default": "",
                 "arghelp": "Comma separated strings of tags to be attached to the nodes\n"
+            },
+            {
+                "argname": "--force",
+                "default": False,
+                "action":"store_true",
+                "arghelp": "Whether to ignore(If --force is specified) or return the error (If --force is not specified) for duplicate node registration\n"
             }
         ]
     },

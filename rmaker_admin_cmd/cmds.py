@@ -666,8 +666,6 @@ def generate_device_cert(vars=None):
 
         # If local = true we will generate node Ids locally
         is_local = vars["local"]
-        if not is_local:
-            is_local = False
         
         is_node_id_file = False
         node_id_list_unique = []
@@ -914,22 +912,23 @@ def register_device_cert(vars=None):
         node_type=vars['type']
         node_model=vars['model']
         subtype = vars['subtype']
+        force = vars['force']
 
-        if not node_type and not node_model and not group_name and not subtype and not parent_group_name and not tags:
+        if not node_type and not node_model and not group_name and not subtype and not parent_group_name and not tags and not force:
             conti=True
-            log.warn("\nWARNING: type, model, group name, subtype, tags and parent groupname are absent.")
+            log.warn("\nWARNING: type, model, group name, subtype, tags, force and parent groupname are absent.")
             while conti:
                 goahead=input("Do you wish to continue? (y/n):")
                 if goahead=="y" or goahead=="Y":
                     conti=False
                 elif goahead=="n" or goahead=="N":
-                    log.info("You can provide type, model, group name , subtype, parent groupname and tags using flags --type,--model,--groupname,--subtype,--parent_groupname,--tags. ")
+                    log.info("You can provide type, model, group name , subtype, force, parent groupname and tags using flags --type,--model,--groupname,--subtype, --force,--parent_groupname,--tags. ")
                     return
                 else:
                     log.error("Please enter a valid input.")
 
         # Register Device Certificate
-        request_id = node_mfg.register_cert_req(basefilename, md5_checksum, refresh_token, node_type, node_model, group_name, parent_group_id, parent_group_name, subtype, tags)
+        request_id = node_mfg.register_cert_req(basefilename, md5_checksum, refresh_token, node_type, node_model, group_name, parent_group_id, parent_group_name, subtype, tags, force)
         if not request_id:
             log.error("Request to register device certificate failed")
             return
