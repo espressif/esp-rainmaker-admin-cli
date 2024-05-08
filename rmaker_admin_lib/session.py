@@ -65,7 +65,7 @@ class Session:
                           request_url))
             response = requests.get(url=request_url,
                                     verify=configmanager.CERT_FILE,
-                                    timeout=(5.0, 5.0))
+                                    timeout=(30.0, 30.0))
             response = json.loads(response.text)
             log.debug("Response received: {}".format(response))
 
