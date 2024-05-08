@@ -104,7 +104,7 @@ class User:
                                         data=json.dumps(login_info),
                                         headers=self.request_header,
                                         verify=configmanager.CERT_FILE,
-                                        timeout=(5.0, 5.0))
+                                        timeout=(30.0, 30.0))
 
                 response = json.loads(response.text)
 
@@ -184,7 +184,7 @@ class User:
                                      data=json.dumps(request_payload),
                                      headers=self.request_header,
                                      verify=configmanager.CERT_FILE,
-                                     timeout=(5.0, 5.0))
+                                     timeout=(30.0, 30.0))
             response = json.loads(response.text)
 
             log.debug("Response received: {}".format(response))

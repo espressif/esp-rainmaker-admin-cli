@@ -95,7 +95,7 @@ class Node_Mfg:
                                              data=json.dumps(request_body),
                                              headers=self.request_header,
                                              verify=configmanager.CERT_FILE,
-                                             timeout=(5.0, 5.0))
+                                             timeout=(30.0, 30.0))
                     log.debug('Response status code '
                               'received: {}'.format(response.status_code))
                     response = json.loads(response.text)
@@ -182,7 +182,7 @@ class Node_Mfg:
                                             params=query_params,
                                             headers=self.request_header,
                                             verify=configmanager.CERT_FILE,
-                                            timeout=(5.0, 5.0))
+                                            timeout=(30.0, 30.0))
                     log.debug("Response status code received: {}".format(
                         response.status_code))
                     response = json.loads(response.text)
@@ -268,7 +268,7 @@ class Node_Mfg:
                                             params=query_params,
                                             headers=self.request_header,
                                             verify=configmanager.CERT_FILE,
-                                            timeout=(5.0, 5.0))
+                                            timeout=(30.0, 30.0))
                     log.debug("Response status code received: {}".format(
                         response.status_code))
                     response = json.loads(response.text)
@@ -345,7 +345,7 @@ class Node_Mfg:
                                     params=query_params,
                                     headers=self.request_header,
                                     verify=configmanager.CERT_FILE,
-                                    timeout=(5.0, 5.0))
+                                    timeout=(30.0, 30.0))
 
             log.debug("Response status code received: {}".format(
                 response.status_code))
@@ -431,7 +431,7 @@ class Node_Mfg:
                                              data=json.dumps(request_body),
                                              headers=self.request_header,
                                              verify=configmanager.CERT_FILE,
-                                             timeout=(5.0, 5.0))
+                                             timeout=(30.0, 30.0))
                     log.debug('Response status code received: {}'.format(
                         response.status_code))
                     response = json.loads(response.text)
@@ -505,7 +505,7 @@ class Node_Mfg:
                                     params=query_params,
                                     headers=self.request_header,
                                     verify=configmanager.CERT_FILE,
-                                    timeout=(5.0, 5.0))
+                                    timeout=(30.0, 30.0))
             log.debug("Response status code received: {}".format(
                 response.status_code))
             response = json.loads(response.text)
@@ -552,7 +552,7 @@ class Node_Mfg:
                 response = requests.get(url=request_url,
                                         headers=self.request_header,
                                         verify=configmanager.CERT_FILE,
-                                        timeout=(5.0, 5.0))
+                                        timeout=(30.0, 30.0))
                 log.debug("Response status code received: {}".format(
                     response.status_code))
                 response = json.loads(response.text)
