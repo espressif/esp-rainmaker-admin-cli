@@ -75,7 +75,7 @@ class User:
             log.debug("Password received")
 
             # Set HTTP Request
-            path = 'login2/'
+            path = 'login2'
             login_info = {
                 'user_name': self.__email,
                 'password': password
