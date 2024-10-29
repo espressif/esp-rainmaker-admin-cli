@@ -389,6 +389,12 @@ COMMANDS = {
                 "default": False,
                 "action":"store_true",
                 "arghelp": "Whether to ignore(If --force is specified) or return the error (If --force is not specified) for duplicate node registration\n"
+            },
+            {
+                "argname": "--update_nodes",
+                "default": False,
+                "action":"store_true",
+                "arghelp": "Whether to skip registration of the device certificates and only add the type, model, subtype and tags to the nodes(If --update_nodes is specified)\n"
             }
         ]
     },

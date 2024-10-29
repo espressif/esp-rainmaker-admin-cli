@@ -282,6 +282,7 @@ python rainmaker_admin_cli.py certs devicecert register [-h] --inputfile <csvfil
                                                         [--model <nodemodel>] [--parent_groupname <parent_groupname>][--subtype <nodesubtype>]
                                                         [--tags <nodetags>]
                                                         [--force]
+                                                        [--update_nodes]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -295,7 +296,9 @@ optional arguments:
                         Name of the parent group to which this newly created group will be a child group      
   --subtype <nodesubtype> Node SubType
   --tags <nodetags> Comma separated strings of tags to be attached to the nodes.(eg: location:Pune,office:espressif)
-  --force  Whether to ignore the error for duplicate node registration
+  --force  Whether to ignore the error for duplicate node registration, also updates the existing certificates
+  --update_nodes Whether to skip registration of the device certificates and only add the type, model, subtype and tags to the nodes.
+  --update_nodes and --force If both are given, only the existing nodes will be updated with the new type, model, subtype and tags, Also the certificates will be updated.New nodes will be skipped.
 ```
 
 For the example in device certificate generation section the node_certs_file file would be `test/2020-11-29/Mfg-00001/common/node_certs.csv`.
@@ -324,7 +327,7 @@ After passing `--tags loc:@city`,
 
 #### Check Device Certificate Registration Status
 
-The certificate registration process can take significant time. One it is finished, the super admin user will get an email with the status. The same can also be checked using the `getcertstatus` command.
+The certificate registration process can take significant time. Once it is finished, the super admin user will get an email with the status. The same can also be checked using the `getcertstatus` command.
 
 Usage:
 
