@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
+import regex
 import csv
 from rmaker_admin_lib.constants import TAG_DYNAMIC_REGEX, TAG_REGEX, TAG_DYNAMIC_SEPARATOR, COLON, COMMA, EMPTY_STRING
 from rmaker_admin_lib.logger import log
@@ -52,7 +52,7 @@ class CsvValidator:
         # Get List of dynamic tag references
         col_names = []
         for tag in tags.split(COMMA):
-            if tag != EMPTY_STRING and re.match(TAG_DYNAMIC_REGEX, tag):
+            if tag != EMPTY_STRING and regex.match(TAG_DYNAMIC_REGEX, tag):
                 _, _, col_name = tag.partition(TAG_DYNAMIC_SEPARATOR)
                 if col_name != EMPTY_STRING:
                     col_names.append(col_name)
@@ -77,9 +77,9 @@ class CsvValidator:
             return False
 
         for tag in tags_array:
-            if re.match(TAG_DYNAMIC_REGEX, tag):
+            if regex.match(TAG_DYNAMIC_REGEX, tag):
                 separator = TAG_DYNAMIC_SEPARATOR
-            elif re.match(TAG_REGEX, tag):
+            elif regex.match(TAG_REGEX, tag):
                 separator = COLON
             else:
                 return False

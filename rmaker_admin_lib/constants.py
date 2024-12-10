@@ -3,8 +3,8 @@ import os
 from rmaker_admin_lib.logger import log
 from rmaker_admin_lib.configmanager import SERVER_CONFIG_FILE
 
-TAG_REGEX = r"^ *[a-zA-Z_.0-9]+ *: *[a-zA-Z_.0-9]+[a-zA-Z_.0-9 ]* *$"
-TAG_DYNAMIC_REGEX = r"^ *[a-zA-Z_.0-9]+ *:@ *[a-zA-Z_.0-9]+[a-zA-Z_.0-9 ]* *$"
+TAG_REGEX = r"^ *[\p{L}\p{M}_.0-9]+ *: *[\p{L}\p{M}_.0-9@<>(){}$+=#'&%-]+[\p{L}\p{M}_.0-9-=+<>(){}$+@#'&% ]* *$"
+TAG_DYNAMIC_REGEX = r"^ *[\p{L}\p{M}_.0-9]+ *:@ *[\p{L}\p{M}_.0-9@<>(){}$+=#'&%-]+[\p{L}\p{M}_.0-9-=+<>(){}$+@#'&% ]* *$"
 TAG_DYNAMIC_SEPARATOR = ":@"
 COLON = ":"
 EMPTY_STRING = ""

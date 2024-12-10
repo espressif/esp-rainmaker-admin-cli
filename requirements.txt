@@ -6,3 +6,4 @@ pyqrcode
 pypng==0.0.20
 python-dateutil
 shortuuid
+regex
