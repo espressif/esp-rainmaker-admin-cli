@@ -283,7 +283,13 @@ class Node_Mfg:
                                  'received successfully')
                         log.debug("URL received: {}".format(
                             response[expected_key_in_resp]))
-                        return response[expected_key_in_resp]
+                        # default request_id
+                        request_id = ""
+                        if "request_id" in response:
+                            log.debug("Request id received: {}".format(
+                                response["request_id"]))
+                            request_id = response["request_id"]
+                        return response[expected_key_in_resp], request_id
                     elif err_status_key in response:
                         log.debug('Request failed: response '
                                   'received: {}'.format(response))
@@ -381,7 +387,7 @@ class Node_Mfg:
         except Exception as req_exc_err:
             raise Exception(req_exc_err)
 
-    def register_cert_req(self, filename, md5_checksum, refresh_token, node_type, model, group_name,parent_group_id,parent_group_name,subtype,tags,force,update_nodes,
+    def register_cert_req(self, filename, md5_checksum, refresh_token, node_type, model, group_name,parent_group_id,parent_group_name,subtype,tags,force,update_nodes,request_id,
                           expected_resp='request_id'):
         '''
         Request to register device certificates
@@ -415,7 +421,8 @@ class Node_Mfg:
                 'subtype':subtype,
                 'tags':tags,
                 'force':force,
-                'update_nodes':update_nodes
+                'update_nodes':update_nodes,
+                'request_id':request_id
             }
             log.debug('Register Certificate Request - url: {} '
                       'req_body: {}'.format(request_url, request_body))
