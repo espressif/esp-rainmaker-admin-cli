@@ -635,6 +635,22 @@ def generate_device_cert(vars=None):
         ret_status = _fileid_check(file_id, node_count, extra_values)
         if not ret_status:
             return
+        
+        # Initialize start and length for prefixing filenames
+        prefix_num = vars.get('prefix_num')
+        if prefix_num:
+            if len(prefix_num) != 2:
+                raise Exception("Both start and length must be provided together for --prefix_num")
+            start, length = prefix_num
+        else:
+            start, length = 1, 6  # default values
+
+         # find the no. of didgits in the start
+        start_digits = len(str(start))
+        # raise error if length is not greater than or equal to start_digits 
+        # and if the length is not greater than or equal to number of digits in (start + count)-1
+        if int(length) < start_digits or int(length) < len(str(int(start) + int(vars['count'])-1)):
+            raise Exception("Length must be greater than or equal to number of digits in start and the last node id using the count, i.e. {}".format(int(start) + int(vars['count'])-1))
 
         # Set default file id
         if not file_id:
@@ -660,7 +676,7 @@ def generate_device_cert(vars=None):
             node_id_list_unique = [*set(node_id_list)]
             is_node_id_file = True
         
-         # Get mqttendpoint
+        # Get mqttendpoint
         endpoint = _get_mqtt_endpoint(is_local, is_node_id_file)
 
         # Generate CA Cert and CA Key
@@ -718,7 +734,6 @@ def generate_device_cert(vars=None):
                     return
                 log.debug("CA Key saved in ca_certificates and common batch folder")
 
-
         node_ids_file, endpoint = _set_data(node_count, common_outdir, is_local, is_node_id_file, endpoint)
 
         if is_node_id_file:
@@ -732,7 +747,7 @@ def generate_device_cert(vars=None):
                                                  file_id,
                                                  outdir,
                                                  endpoint,
-                                                 prov_type, node_id_list_unique)
+                                                 prov_type, node_id_list_unique, start, length)
         if not certs_dest_filename:
             log.error("Generate device certificate failed")
             return
@@ -740,7 +755,7 @@ def generate_device_cert(vars=None):
                  'location: {}'.format(certs_dest_filename))
         # Generate binaries
         log.info("\nGenerating binaries for the device certficates generated")
-        gen_cert_bin(outdir, file_id)
+        gen_cert_bin(outdir, file_id, start, length)
         log.info('\nYou can now run: \npython rainmaker_admin_cli.py certs '
                  'devicecert register --inputfile {} '
                  '(Register Generated Device Certificate(s))'.format(certs_dest_filename))
@@ -1088,3 +1103,4 @@ def configure_server(vars=None):
         log.error("\nServer config not set")
     except Exception as e:
         log.error("Error: {}".format(e))
+        

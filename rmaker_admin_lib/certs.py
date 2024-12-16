@@ -15,6 +15,7 @@
 
 from __future__ import absolute_import, print_function, unicode_literals
 
+import csv
 from io import open
 import os
 import sys
@@ -60,7 +61,7 @@ CERT_VALIDATION_YEARS = 100
 
 class Mfg_Args():
     def __init__(self, dest_config_filename, dest_values_filename,
-                 data, outdir, keygen, file_id):
+                 data, outdir, keygen, file_id, prefix, prefix_num):
         self.conf = dest_config_filename
         self.values = dest_values_filename
         if data:
@@ -68,6 +69,9 @@ class Mfg_Args():
         else:
             self.size = data
         self.outdir = outdir
+        self.fileid = file_id
+        self.prefix = prefix
+        self.prefix_num = prefix_num
         # Set version=2, multipage blob support enabled
         self.version = 2
         self.keygen = keygen
@@ -76,13 +80,14 @@ class Mfg_Args():
         self.keyfile = None
         self.input = None
         self.output = None
-        self.fileid = file_id
+        self.key_protect_hmac = False
+        
         log.debug('Arguments set to send to manufacturing tool for '
                   'creating NVS partiton binaries')
         log.debug('conf: {}, values: {}, size: {}, '
                   'outdir: {}, version: {} '
                   'keygen: {}, inputkey: {}, keyfile: {}, '
-                  'input: {}, output: {}, fileid: {}'.format(
+                  'input: {}, output: {}, fileid: {}, prefix: {}, prefix_num: {}'.format(
                       self.conf,
                       self.values,
                       self.size,
@@ -93,7 +98,9 @@ class Mfg_Args():
                       self.keyfile,
                       self.input,
                       self.output,
-                      self.fileid))
+                      self.fileid,
+                      self.prefix,
+                      self.prefix_num))
 
 
 def save_to_file(file_data, output_dir,
@@ -246,7 +253,8 @@ def _save_nodeid_cert_and_qrcode_to_file(node_id, dev_cert, qrcode_payload, dest
         
         # Convert certificate to PEM format (string) and wrap it in quotes
         dev_cert_bytes = dev_cert.public_bytes(encoding=serialization.Encoding.PEM)
-        dev_cert_str = double_quote + dev_cert_bytes.decode('utf-8').replace('\n', '') + double_quote
+        dev_cert_str = double_quote + dev_cert_bytes.decode('utf-8') + \
+            double_quote
 
         # Serialize and wrap qrcode_payload in quotes
         qrcode_str = double_quote + str(qrcode_payload).replace('"', '""') + double_quote
@@ -256,19 +264,19 @@ def _save_nodeid_cert_and_qrcode_to_file(node_id, dev_cert, qrcode_payload, dest
         new_data = [node_id, dev_cert_str, qrcode_str]
 
         data_to_write = delimiter.join(new_data) + newline
-        # Write to file
-        if isinstance(dest_csv_file, str):
+       # Writing to file
+        if isinstance(dest_csv_file, str): # If `dest_csv_file` is a string (if file path provided)
             with open(dest_csv_file, 'a') as f:
                 f.write(data_to_write)
         else:
-            dest_csv_file.write(data_to_write)
+            dest_csv_file.write(data_to_write)  # If not a string, assume `dest_csv_file` is a file object and write directly
 
         log.debug("Node Id, Cert, and QR code saved to file successfully")
         return True
+
     except FileError as file_err:
         log.error(FileError('Error occurred while saving node id, cert, and QR code to '
                             'file {} error: {} \n'.format(dest_csv_file, file_err)))
-
     except Exception as err:
         log.error(FileError('Error occurred while saving node id, cert, and QR code to '
                             'file {} error: {} \n'.format(dest_csv_file, err)))
@@ -699,6 +707,66 @@ def _create_values_file(dest_values_file, id, node_id,
     values_file.close()
     log.debug("Done creating values file")
 
+# Function from mfg_gen, added here to verify extra config and values files
+def create_temp_files(args):
+    new_filenames = []
+    for filename in [args.conf, args.values]:
+        name, ext = os.path.splitext(filename)
+        new_filename = name + '_tmp' + ext
+        strip_blank_lines(filename, new_filename)
+        new_filenames.append(new_filename)
+    return new_filenames
+
+# Function from mfg_gen, added here to verify extra config and values files
+def strip_blank_lines(input_filename, output_filename):
+    with open(input_filename, 'r') as read_from, open(output_filename,'w', newline='') as write_to:
+        for line in read_from:
+            if not line.isspace():
+                write_to.write(line)
+
+# Function from mfg_gen, added here to verify extra config and values files
+def verify_file_format(args):
+    keys_in_config_file = []
+    keys_in_values_file = []
+    keys_repeat = []
+
+    # Verify files have csv extension
+    conf_name, conf_extension = os.path.splitext(args.conf)
+    if conf_extension != '.csv':
+        raise SystemExit('Error: config file: %s does not have the .csv extension.' % args.conf)
+    values_name, values_extension = os.path.splitext(args.values)
+    if values_extension != '.csv':
+        raise SystemExit('Error: values file: %s does not have the .csv extension.' % args.values)
+
+    # Verify files are not empty
+    if os.stat(args.conf).st_size == 0:
+        raise SystemExit('Error: config file: %s is empty.' % args.conf)
+    if os.stat(args.values).st_size == 0:
+        raise SystemExit('Error: values file: %s is empty.' % args.values)
+
+    # Extract keys from config file
+    with open(args.conf, 'r') as config_file:
+        config_file_reader = csv.reader(config_file, delimiter=',')
+        for config_data in config_file_reader:
+            if 'namespace' not in config_data:
+                keys_in_config_file.append(config_data[0])
+            if 'REPEAT' in config_data:
+                keys_repeat.append(config_data[0])
+
+    # Extract keys from values file
+    with open(args.values, 'r') as values_file:
+        values_file_reader = csv.reader(values_file, delimiter=',')
+        keys_in_values_file = next(values_file_reader)
+
+    # Verify file identifier exists in values file
+    if args.fileid:
+        if args.fileid not in keys_in_values_file:
+            raise SystemExit('Error: target_file_identifier: %s does not exist in values file.\n' % args.fileid)
+    else:
+        args.fileid = 1
+
+    return keys_in_config_file, keys_in_values_file, keys_repeat
+
 def verify_mfg_files(outdir, config_filename, values_filename, file_id):
     '''
     Verify Mfg files format and data is valid
@@ -710,18 +778,30 @@ def verify_mfg_files(outdir, config_filename, values_filename, file_id):
         None,
         None,
         None,
-        file_id)
+        file_id,
+        'node',
+        None)
     log.debug("Verifying mfg files")
-    # Only verify files, csv is not generated here
-    mfg_gen.generate(mfg_args)
-    log.debug("Mfg files verified")
+    # Verifying extra_config and extra_values files using mfg_gen functions as it is, to avoid generating their extra csv and binaries.
+    mfg_args.conf, mfg_args.values = create_temp_files(mfg_args)
 
-def gen_cert_bin(outdir, file_id):
+    # Verify input config and values file format
+    keys_in_config_file, keys_in_values_file, keys_repeat = verify_file_format(mfg_args)
+
+    log.debug("Extra config and values files verified")
+
+def gen_cert_bin(outdir, file_id, prefix_num_start, prefix_num_digits):
     '''
     Generate binaries for certificate(s)
 
     :param outdir: Output Directory
     :type outdir: str
+
+    :param prefix_num_start: Starting number for prefix (default is 1)
+    :type prefix_num_start: str
+
+    :param prefix_num_digits: Number of digits for prefix (default is 6)
+    :type prefix_num_digits: str
     '''
     log.debug("Setting config arguments for generating binaries")
     common_outdir = os.path.join(outdir, 'common')
@@ -747,9 +827,11 @@ def gen_cert_bin(outdir, file_id):
         config['DEFAULT'],
         outdir,
         keygen,
-        file_id)
+        file_id, 
+        'node',
+        (int(prefix_num_start),int(prefix_num_digits)))
     log.debug("Generating binaries")
-    mfg_gen.generate(mfg_args, create_csv=True)
+    mfg_gen.generate(mfg_args)
     log.debug("Binaries generated")
 
 def gen_hex_str(octets=64):
@@ -944,6 +1026,7 @@ def _gen_prov_data(node_id_dir, node_id_dir_str, qrcode_outdir, random_hex_str, 
         return
     log.debug("QR code image saved to file")
     return True, qrcode_payload
+
 def _init_file(common_outdir):
     log.debug("In init file")
     # Setup destination filename if not provided
@@ -1031,7 +1114,7 @@ def _certs_files_init(dest_filename):
     return dest_csv_file
 
 def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
-                       file_id, outdir, endpoint, prov_type, node_id_list_unique):
+                       file_id, outdir, endpoint, prov_type, node_id_list_unique, prefix_num_start, prefix_num_digits):
     '''
     Generate and save device certificate
 
@@ -1052,10 +1135,15 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
 
     :param endpoint: MQTT Endpoint
     :type endpoint: str
+
+    :param prefix_num_start: Starting number for prefix (default is 1)
+    :type prefix_num_start: str
+
+    :param prefix_num_digits: Number of digits for prefix (default is 6)
+    :type prefix_num_digits: str
     '''
     file_id_suffix = None
-    max_filename_len = 6
-    cnt = 1
+    cnt = int(prefix_num_start)
     step_cnt = 100
     extra_keys = None
     extra_values_file_ptr = None
@@ -1122,9 +1210,8 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
                                                 file_id, extra_values_filename)) 
 
             # Create directory for node details for specific node id
-            zeros_prefix_len = max_filename_len - len(str(cnt))
-            zero_prefix_str = '0' * zeros_prefix_len
-            node_id_dir_str='node-' + zero_prefix_str + str(cnt) + "-" + file_id_suffix
+            prefix_number = f'{int(cnt):0{prefix_num_digits}}'
+            node_id_dir_str = 'node-' + str(prefix_number) + "-" + str(file_id_suffix)
             node_id_dir = os.path.join(node_details_outdir, node_id_dir_str)
             if not os.path.isdir(node_id_dir):
                 distutils.dir_util.mkpath(node_id_dir)
@@ -1216,7 +1303,7 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
                 return False
             log.debug("Number of certificates generated and saved")
             _print_status(cnt, step_cnt, msg='Certificates generated')
-
+            
             cnt += 1
         log.info("\nTotal certificates generated: {}".format(str(cnt - 1)))
         # Cleanup
