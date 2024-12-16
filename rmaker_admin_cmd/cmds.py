@@ -498,7 +498,7 @@ def _set_data(node_count, common_outdir, is_local, is_input_file, endpoint):
     if not endpoint_file:
         return None, None
     log.info("Endpoint saved at location: {}".format(endpoint_file))    
-    return node_ids_file, endpoint_file
+    return node_ids_file, endpoint
 
 def gen_node_id_local(node_count):
     '''
@@ -718,11 +718,11 @@ def generate_device_cert(vars=None):
                 log.debug("CA Key saved in ca_certificates and common batch folder")
 
 
-        node_ids_file, endpoint_file = _set_data(node_count, common_outdir, is_local, is_node_id_file, endpoint)
+        node_ids_file, endpoint = _set_data(node_count, common_outdir, is_local, is_node_id_file, endpoint)
 
         if is_node_id_file:
             node_ids_file = input_node_ids_file
-        if not node_ids_file and not endpoint_file:
+        if not node_ids_file and len(endpoint)==0:
             raise Exception("")
         # Generate Device Cert and save into file
         certs_dest_filename = gen_and_save_certs(ca_cert,
@@ -730,7 +730,7 @@ def generate_device_cert(vars=None):
                                                  node_ids_file,
                                                  file_id,
                                                  outdir,
-                                                 endpoint_file,
+                                                 endpoint,
                                                  prov_type, node_id_list_unique)
         if not certs_dest_filename:
             log.error("Generate device certificate failed")

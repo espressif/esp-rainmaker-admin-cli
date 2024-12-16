@@ -785,10 +785,10 @@ def _create_mfg_config_file(outdir):
     config_csv_file = [
         'rmaker_creds,namespace,',
         'node_id,data,binary',
-        'mqtt_host,file,binary',
+        'mqtt_host,data,binary',
         'client_cert,file,binary',
         'client_key,file,binary',
-        'random,file,hex2bin'
+        'random,data,hex2bin'
     ]
 
     # Check if additonal config file is given
@@ -1021,7 +1021,7 @@ def _certs_files_init(dest_filename):
     return dest_csv_file
 
 def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
-                       file_id, outdir, endpoint_file, prov_type, node_id_list_unique):
+                       file_id, outdir, endpoint, prov_type, node_id_list_unique):
     '''
     Generate and save device certificate
 
@@ -1040,8 +1040,8 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
     :param outdir: Output Directory
     :type outdir: str
 
-    :param endpoint_file: Endpoint filename
-    :type endpoint_file: str
+    :param endpoint: MQTT Endpoint
+    :type endpoint: str
     '''
     file_id_suffix = None
     max_filename_len = 6
@@ -1157,10 +1157,10 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
                 dest_values_filename,
                 cnt,
                 node_id,
-                endpoint_file,
+                endpoint,
                 cert_dest_filename,
                 key_dest_filename,
-                random_str_file,
+                random_hex_str,
                 curr_extra_values)
 
             # Generate device certificate
