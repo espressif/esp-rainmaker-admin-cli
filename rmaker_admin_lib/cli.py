@@ -324,6 +324,12 @@ COMMANDS = {
                 "nargs": 2,
                 "default": [1, 6],  # Default start=1 and length=6
                 "arghelp": 'Prefix number (counter) start and length (in digits) to be added for each output filename'
+            },
+            {
+                "argname": "--prov_prefix",
+                "metavar": "<prov_prefix>",
+                "default": "PROV",
+                "arghelp": 'Optional prefix in provisioning name (requires changes in firmware)',
             }
         ]
     },

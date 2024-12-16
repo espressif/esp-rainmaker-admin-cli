@@ -617,9 +617,14 @@ def generate_device_cert(vars=None):
         file_id = vars['fileid']
         if len(file_id) == 0:
             file_id = None
+
         prov_type = BLUETOOTH
         if vars['prov']:
             prov_type = vars['prov']
+
+        prov_prefix = "PROV"
+        if vars['prov_prefix']:
+            prov_prefix = vars['prov_prefix']
         
         # Set output dirname
         outdir = _set_output_dir(vars['outdir'])
@@ -747,7 +752,7 @@ def generate_device_cert(vars=None):
                                                  file_id,
                                                  outdir,
                                                  endpoint,
-                                                 prov_type, node_id_list_unique, start, length)
+                                                 prov_type, prov_prefix, node_id_list_unique, start, length)
         if not certs_dest_filename:
             log.error("Generate device certificate failed")
             return
@@ -1103,4 +1108,3 @@ def configure_server(vars=None):
         log.error("\nServer config not set")
     except Exception as e:
         log.error("Error: {}".format(e))
-        
