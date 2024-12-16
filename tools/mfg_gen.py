@@ -139,7 +139,8 @@ def verify_data_in_file(input_config_file, input_values_file, config_file_keys, 
                 if not isinstance(values_file_line, str):
                     values_file_line = values_file_line.encode('utf-8')
 
-                values_file_data = values_file_line.strip().split(',')
+                # values.csv contains 1 extra key (qrcode) as last key-value pair and node_info.csv shouldn't, hence removing the qrcode value from values_file_data by splitting till key_count_in_values_file-1 to verify without error
+                values_file_data = values_file_line.strip().split(',', key_count_in_values_file-1)
 
                 lineno += 1
                 if len(values_file_data) == 1 and '' in values_file_data:

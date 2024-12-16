@@ -35,6 +35,7 @@ from rmaker_admin_lib.session import Session
 from rmaker_admin_lib.configmanager import SERVER_CONFIG_FILE
 from rmaker_admin_lib.csv_validator import CsvValidator
 from rmaker_admin_lib.constants import MQTT_PREFIX_SUBFOLDER_REGEX
+from rmaker_admin_lib.constants import BLUETOOTH
 try:
     from future.utils import iteritems
     from builtins import input, str
@@ -616,9 +617,9 @@ def generate_device_cert(vars=None):
         file_id = vars['fileid']
         if len(file_id) == 0:
             file_id = None
-        prov_type = None
+        prov_type = BLUETOOTH
         if vars['prov']:
-            prov_type = vars['prov']        
+            prov_type = vars['prov']
         
         # Set output dirname
         outdir = _set_output_dir(vars['outdir'])

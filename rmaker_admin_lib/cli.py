@@ -288,7 +288,7 @@ COMMANDS = {
             {
                 "argname": "--prov",
                 "metavar": "<prov_type>",
-                "default": "",
+                "default": "ble",
                 "arghelp": 'Provisioning type to '
                            'generate QR code \n(softap/ble)',
                 "choices": ['softap', 'ble']

@@ -223,46 +223,55 @@ def save_key(key, filepath):
                             'error: {} \n'.format(filepath, err)))
         log.error('Error: Failed to save key in file {}'.format(filepath))
 
-def _save_nodeid_and_cert_to_file(node_id, dev_cert, dest_csv_file):
+def _save_nodeid_cert_and_qrcode_to_file(node_id, dev_cert, qrcode_payload, dest_csv_file):
     '''
-    Save Node Id and Certificate to file
+    Save Node ID, Certificate, and QR code to file.
 
-    :param node_id: Node Id
+    :param node_id: Node ID
     :type node_id: str
 
     :param dev_cert: Device Certificate
     :type dev_cert: x509 Certificate
 
+    :param qrcode_payload: QR code payload, can contain commas
+    :type qrcode_payload: dict (or str if already serialized)
+
     :param dest_csv_file: Destination CSV file
-    :type dest_csv_file: str
+    :type dest_csv_file: str or file object (must support write operations)
     '''
     try:
         delimiter = ","
         newline = "\n"
         double_quote = "\""
-        dev_cert_bytes = dev_cert.public_bytes(
-            encoding=serialization.Encoding.PEM,)
-        dev_cert_str = double_quote + dev_cert_bytes.decode('utf-8') + \
-            double_quote
-        log.debug("Saving node id and cert to file: {}".format(
-            dest_csv_file))
-        new_data = [node_id, dev_cert_str]
+        
+        # Convert certificate to PEM format (string) and wrap it in quotes
+        dev_cert_bytes = dev_cert.public_bytes(encoding=serialization.Encoding.PEM)
+        dev_cert_str = double_quote + dev_cert_bytes.decode('utf-8').replace('\n', '') + double_quote
+
+        # Serialize and wrap qrcode_payload in quotes
+        qrcode_str = double_quote + str(qrcode_payload).replace('"', '""') + double_quote
+
+        # Prepare new CSV data
+        log.debug("Saving node id, cert, and qrcode to file: {}".format(dest_csv_file))
+        new_data = [node_id, dev_cert_str, qrcode_str]
+
         data_to_write = delimiter.join(new_data) + newline
-        dest_csv_file.write(data_to_write)
-        log.debug("Node Id and Cert saved to file: {}".format(
-            dest_csv_file))
-        log.debug("Node id and certificate saved to file successfully")
+        # Write to file
+        if isinstance(dest_csv_file, str):
+            with open(dest_csv_file, 'a') as f:
+                f.write(data_to_write)
+        else:
+            dest_csv_file.write(data_to_write)
+
+        log.debug("Node Id, Cert, and QR code saved to file successfully")
         return True
     except FileError as file_err:
-        log.error(FileError('Error occurred while saving node id and cert to '
-                            'file {} error: {} \n'.format(
-                                dest_csv_file,
-                                file_err)))
+        log.error(FileError('Error occurred while saving node id, cert, and QR code to '
+                            'file {} error: {} \n'.format(dest_csv_file, file_err)))
+
     except Exception as err:
-        log.error(FileError('Error occurred while saving node id and cert to '
-                            'file {} error: {} \n'.format(
-                                dest_csv_file,
-                                err)))
+        log.error(FileError('Error occurred while saving node id, cert, and QR code to '
+                            'file {} error: {} \n'.format(dest_csv_file, err)))
         raise
 
 def _set_filename(filename_prefix=None, outdir=None, ext=None):
@@ -418,7 +427,7 @@ def _write_header_to_dest_csv(dest_csv_file):
     '''
     delimiter = ","
     newline = "\n"
-    header = ["node_id", "certs"]
+    header = ["node_id", "certs", "qrcode"]
     log.debug("Writing header to csv file: {}".format(header))
     keys_to_write = delimiter.join(header)
     keys_to_write = keys_to_write + newline
@@ -662,11 +671,11 @@ def generate_devicecert(outdir, ca_cert, ca_private_key,
         raise Exception(err)
 
 def _create_values_file(dest_values_file, id, node_id,
-                        endpoint, cert, cert_key, random_str, curr_extra_values):
+                        endpoint, cert, cert_key, random_str, qrcode_payload, curr_extra_values):
     log.debug("Writing to values file for manufacturing tool")
     log.debug('Writing data to values file: values_file:{} id:{} '
               'node_id:{} endpoint:{} cert:{} cert_key:{} random_str:{} '.format(
-                  dest_values_file, id, node_id, endpoint, cert, cert_key, random_str))
+                  dest_values_file, id, node_id, endpoint, cert, cert_key, random_str, qrcode_payload))
     values_file = open(dest_values_file, 'a')
     values_file.write(str(id))
     values_file.write(',')
@@ -679,6 +688,8 @@ def _create_values_file(dest_values_file, id, node_id,
     values_file.write(cert_key)
     values_file.write(',')
     values_file.write(random_str)
+    values_file.write(',')
+    values_file.write(f'"{str(qrcode_payload)}"')
     if curr_extra_values:
         for item in curr_extra_values:
             values_file.write(',')
@@ -932,8 +943,7 @@ def _gen_prov_data(node_id_dir, node_id_dir_str, qrcode_outdir, random_hex_str, 
     if not qrcode_img_file:
         return
     log.debug("QR code image saved to file")
-    return True
-
+    return True, qrcode_payload
 def _init_file(common_outdir):
     log.debug("In init file")
     # Setup destination filename if not provided
@@ -981,7 +991,7 @@ def _mfg_files_init(common_outdir, extra_keys_list):
     # Open values file (needed for generating binary)
     log.debug("Creating values file for manufacturing tool")
     # Set final values  keys
-    values_keys = 'id,node_id,mqtt_host,client_cert,client_key,random'
+    values_keys = 'id,node_id,mqtt_host,client_cert,client_key,random,qrcode'
     if extra_keys_list:
         # Get each comma seperated value in line
         for item in extra_keys_list:
@@ -1151,6 +1161,14 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
             # Print status
             _print_status(cnt, step_cnt, msg='Random str (used as PoP) generated')
 
+            # Generate provisioning data
+            # QR code image and str
+            prov_status, qrcode_payload = _gen_prov_data(node_id_dir, node_id_dir_str, qrcode_outdir, random_hex_str, prov_type)
+            if not prov_status:
+                return
+            # Print QR code status
+            _print_status(cnt, step_cnt, msg='QRcode payload and image generated')
+
             # Create values file for input to
             # Manufacturing Tool to generate binaries
             _create_values_file(
@@ -1161,6 +1179,7 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
                 cert_dest_filename,
                 key_dest_filename,
                 random_hex_str,
+                qrcode_payload,
                 curr_extra_values)
 
             # Generate device certificate
@@ -1188,23 +1207,16 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
             # (used to upload and register the certificates)
             log.debug("Saving Node Id and Certificate to file: {}".format(
                 dest_filename))
-            ret_status = _save_nodeid_and_cert_to_file(
+            ret_status = _save_nodeid_cert_and_qrcode_to_file(
                 node_id,
                 dev_cert,
+                qrcode_payload,
                 dest_csv_file)
             if not ret_status:
                 return False
             log.debug("Number of certificates generated and saved")
             _print_status(cnt, step_cnt, msg='Certificates generated')
-            # Generate QR code
-            if prov_type:
-                # Generate provisioning data
-                # QR code image and str
-                prov_status = _gen_prov_data(node_id_dir, node_id_dir_str, qrcode_outdir, random_hex_str, prov_type)
-                if not prov_status:
-                    return
-                # Print QR code status
-                _print_status(cnt, step_cnt, msg='QRcode payload and image generated')
+
             cnt += 1
         log.info("\nTotal certificates generated: {}".format(str(cnt - 1)))
         # Cleanup
