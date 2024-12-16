@@ -10,6 +10,7 @@ COLON = ":"
 EMPTY_STRING = ""
 COMMA = ","
 VERSION = 'v1'
+MQTT_PREFIX_SUBFOLDER_REGEX = r'([a-zA-Z0-9]+)-ats\.iot'
 
 try:
     if os.path.exists(SERVER_CONFIG_FILE):

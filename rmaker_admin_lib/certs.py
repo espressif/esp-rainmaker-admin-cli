@@ -34,6 +34,7 @@ try:
     from cryptography.x509.oid import NameOID
     from cryptography.hazmat.primitives.asymmetric import rsa
     from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.x509 import load_pem_x509_certificate
     from cryptography.hazmat.backends import default_backend
     from configparser import ConfigParser
     from builtins import str
@@ -423,6 +424,16 @@ def _write_header_to_dest_csv(dest_csv_file):
     keys_to_write = keys_to_write + newline
     dest_csv_file.write(keys_to_write)
     return dest_csv_file
+
+def load_existing_cert(cert_path):
+    with open(cert_path, "rb") as cert_file:
+        cert_data = cert_file.read()
+    return load_pem_x509_certificate(cert_data, default_backend())
+
+def load_existing_key(key_path):
+    with open(key_path, "rb") as key_file:
+        key_data = key_file.read()
+    return serialization.load_pem_private_key(key_data, password=None, backend=default_backend())
 
 def _generate_cert(subject_name=None, issuer_name=None,
                    public_key=None, ca_key=None, ca=False):

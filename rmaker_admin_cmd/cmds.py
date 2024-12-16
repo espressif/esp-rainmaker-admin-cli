@@ -14,6 +14,8 @@
 
 from io import open
 import os
+import re
+import shutil
 import sys
 import hashlib
 import datetime
@@ -32,6 +34,7 @@ from rmaker_admin_lib.user import User
 from rmaker_admin_lib.session import Session
 from rmaker_admin_lib.configmanager import SERVER_CONFIG_FILE
 from rmaker_admin_lib.csv_validator import CsvValidator
+from rmaker_admin_lib.constants import MQTT_PREFIX_SUBFOLDER_REGEX
 try:
     from future.utils import iteritems
     from builtins import input, str
@@ -114,7 +117,7 @@ def _check_dir_exists(dirpath):
 
 def _check_file_exists(filepath):
     log.debug("Check if file exists: {}".format(filepath))
-    if os.path.isfile(filepath):
+    if os.path.exists(filepath):
         sys.exit("File {} exists. Please provide a different <outdir>".format(filepath))
 
 def _get_cacert_user_input(cfg, cfg_menu):
@@ -169,6 +172,50 @@ def _set_output_dir(outdir):
     log.debug("New outdir set to: {}".format(outdir))
     return outdir
 
+def _set_output_dir_cacert(outdir, endpointprefix):
+    """
+    Set output directory for CA Certificates.
+
+    This function ensures that a 'ca_certificates' directory exists in the 
+    provided `outdir` or current directory if no `outdir` is specified. 
+    Inside the 'ca_certificates' directory, it creates a subfolder named 
+    after the `endpointprefix`.
+    
+    :param outdir: The base directory where 'ca_certificates' should be created.
+    :param endpointprefix: The unique prefix for the subdirectory inside 'ca_certificates'.
+    :return: The path to the endpoint-specific directory inside 'ca_certificates'.
+    """
+    # Use current directory if outdir is not provided
+    if not outdir:
+        outdir = os.getcwd()
+    
+    # Remove any trailing slashes or path separators
+    outdir = os.path.expanduser(outdir.rstrip(os.sep))
+    log.debug("Initial outdir: {}".format(outdir))
+
+    # Define 'ca_certificates' directory
+    ca_certificates_dir = os.path.join(outdir, 'ca_certificates')
+    
+    # Create 'ca_certificates' directory if it doesn't exist
+    if not os.path.exists(ca_certificates_dir):
+        os.makedirs(ca_certificates_dir)
+        log.debug("Directory created: {}".format(ca_certificates_dir))
+    else:
+        log.debug("'ca_certificates' directory already exists")
+
+    # Create the endpoint-specific folder inside 'ca_certificates'
+    endpoint_dir = os.path.join(ca_certificates_dir, endpointprefix)
+    
+    # Create the endpoint-specific directory if it doesn't exist
+    if not os.path.exists(endpoint_dir):
+        os.makedirs(endpoint_dir)
+        log.debug("Directory created: {}".format(endpoint_dir))
+    else:
+        log.debug("Directory for endpoint '{}' already exists".format(endpointprefix))
+    
+    # Return the path to the endpoint-specific directory
+    return endpoint_dir
+
 def _gen_common_files_dir(outdir):
     '''
     Generate common files dir
@@ -180,7 +227,7 @@ def _gen_common_files_dir(outdir):
         log.debug("Directory created: {}".format(common_outdir))
     return common_outdir
 
-def generate_ca_cert(vars=None, outdir=None, common_outdir=None, cli_call=True):
+def generate_ca_cert(vars=None, outdir=None, common_outdir=None, cli_call=True, mqtt_endpoint=None):
     '''
     Generate CA Certificate
 
@@ -198,22 +245,77 @@ def generate_ca_cert(vars=None, outdir=None, common_outdir=None, cli_call=True):
     :rtype: None
     '''
     try:
-        log.debug("Generate CA certificate")
-        if not outdir:
-            # Set output dirname
-            outdir = _set_output_dir(vars['outdir'])
-        if not common_outdir:
-            # Create output directory for all common files generated
-            common_outdir = _gen_common_files_dir(outdir)
-        
-        # Set CA cert and CA key filepath
-        cacert_filepath = os.path.join(common_outdir, CACERT_FILENAME)
-        cakey_filepath = os.path.join(common_outdir, CA_KEY_FILENAME)
+        # Get mqttendpoint to uniquely identify folder
+        if mqtt_endpoint == None:
+            node_mfg = Node_Mfg(None)
+            is_local = True
+            mqtt_endpoint = node_mfg.get_mqtthostname(is_local)
 
+        # Extract the mqtt_endpoint prefix using regex
+        ca_prefix = re.match(MQTT_PREFIX_SUBFOLDER_REGEX, mqtt_endpoint)
+        if ca_prefix:
+            endpointprefix = ca_prefix.group(1)
+
+        log.debug("Generate CA certificate")
+
+        cmd_flag_outdir = vars['outdir']
+        cwd = os.getcwd()
+        # Set output directory using endpoint prefix when ca cert generate command is run without any outdir 
+        if cmd_flag_outdir == cwd and not common_outdir and not outdir:
+            outdir_cwd = _set_output_dir_cacert(vars['outdir'], endpointprefix)
+        # Create a dir if does not exist when outdir is given in ca cert generate command to add cert & key without any sub-folders
+        elif vars['outdir'] and not common_outdir:
+            outdir_cwd = vars['outdir']
+            os.makedirs(outdir_cwd, exist_ok=True)  # Ensures the directory is created if it doesn't exist
+        # Set output directory using endpoint prefix when device cert generate command is run
+        elif common_outdir:
+            outdir_cwd = _set_output_dir_cacert(None, endpointprefix)
+
+
+        ca_cert_filepath_original = os.path.join(outdir_cwd, CACERT_FILENAME)
+        ca_key_filepath_original = os.path.join(outdir_cwd, CA_KEY_FILENAME)
+        log.info("ca_key_filepath_original is : {}".format(ca_key_filepath_original))
+
+        # Create the common directory only if common_outdir is passed
+        if common_outdir:
+            common_outdir = _gen_common_files_dir(outdir)
+            # Set CA cert and CA key filepaths within the common directory
+            cacert_filepath_common = os.path.join(common_outdir, CACERT_FILENAME)
+            cakey_filepath_common = os.path.join(common_outdir, CA_KEY_FILENAME)
+
+        # Check if the CA certificate and key already exist
+        if os.path.exists(ca_cert_filepath_original) and os.path.exists(ca_key_filepath_original):
+            log.info("CA Certificate and Key already exist. Reusing the existing files.")
+
+            # If an existing certificate and key are found, load them and return as objects
+            existing_cert = load_existing_cert(ca_cert_filepath_original)  # Load as x509.Certificate object
+            existing_key = load_existing_key(ca_key_filepath_original)  # Load as RSAPrivateKey object
+
+            # If common_outdir is provided, copy the existing cert and key to the common_outdir
+            if common_outdir:
+                shutil.copy(ca_cert_filepath_original, cacert_filepath_common)
+                shutil.copy(ca_key_filepath_original, cakey_filepath_common)
+                log.info('CA Certificate and Key successfully added to both directories: {}\n and {}\n'.format(common_outdir, outdir_cwd))
+            else:
+                log.info('CA Certificate and Key already present in directory: {}\n'.format(outdir_cwd))
+
+            # Return the existing cert and key
+            return existing_cert, existing_key
+
+        # If no existing files, ask the user if they want to create new ones
+        create_new_cert = input("No CA certificate found. Do you want to create a new one? [Y/N]: ")
+        if create_new_cert.lower() != 'y':
+            log.info("CA Certificate generation aborted by user.")
+            return
+
+        # If CLI call, display the output directory
         if cli_call:
             _print_keyboard_interrupt_message()
-            log.info('Files generated will be stored '
-                    'in directory: {}'.format(outdir))
+            if common_outdir:
+                log.info('Files generated will be stored in directory: {}\n and {}\n'.format(common_outdir, outdir_cwd))
+            else:
+                log.info('Files generated will be stored in directory: {}\n'.format(outdir_cwd))
+
         # Set CA cert input config menu
         cacert_cfg_menu = {
             "country_name": "Country Name (2 letter code) []:",
@@ -224,6 +326,7 @@ def generate_ca_cert(vars=None, outdir=None, common_outdir=None, cli_call=True):
             "common_name": "Common Name (eg, fully qualified host name) []:",
             "email_addr": "Email Address []:"
         }
+
         # Initialise CA cert config data
         ca_cert_cfg = {
             "country_name": "",
@@ -240,33 +343,52 @@ def generate_ca_cert(vars=None, outdir=None, common_outdir=None, cli_call=True):
 
         # Get CA Certificate info from user
         ca_cert_cfg_values = _get_cacert_user_input(ca_cert_cfg, cacert_cfg_menu)
-        
+
         # Generate CA Private Key
         ca_private_key = generate_private_key()
         if not ca_private_key:
             log.error("Failed to generate private key")
             return
-        # Save CA Private Key into a file
-        ret_status = save_key(ca_private_key, cakey_filepath)
-        if not ret_status:
-            return
+
+        # Save CA Private Key into the respective directories
+        ret_status_original = save_key(ca_private_key, ca_key_filepath_original)
+        if common_outdir:
+            # Also save in the common_outdir
+            ret_status_common = save_key(ca_private_key, cakey_filepath_common)
+            if not ret_status_original or not ret_status_common:
+                return
+        else:
+            if not ret_status_original:
+                return
+
         # Generate CA Certificate
         cacert = generate_cacert(ca_cert_cfg_values, ca_private_key)
         if not cacert:
             print("Failed to generate CA certificate")
             return
-        log.info('CA Certificate generated successfully '
-                 'in directory: {}\n'.format(common_outdir))
-        # Save CA Certificate into a file
-        cacert_filepath = os.path.join(common_outdir, CACERT_FILENAME)
-        ret_status = save_cert(cacert, cacert_filepath)
-        if not ret_status:
-            return
 
+        # Save CA Certificate into the respective directories
+        ret_status_original = save_cert(cacert, ca_cert_filepath_original)
+        if common_outdir:
+            # Also save in the common_outdir
+            ret_status_common = save_cert(cacert, cacert_filepath_common)
+            if not ret_status_original or not ret_status_common:
+                return
+        else:
+            if not ret_status_original:
+                return
+
+        # Adjust log message based on whether common_outdir is used or not
+        if common_outdir:
+            log.info('CA Certificate generated successfully in both directories: {}\n and {}\n'.format(common_outdir, outdir_cwd))
+        else:
+            log.info('CA Certificate generated successfully in directory: {}\n'.format(outdir_cwd))
+
+        # Output message based on CLI call
         if cli_call:
             log.info('You can now run: \npython rainmaker_admin_cli.py certs '
-                    'devicecert generate -h '
-                    '(Generate Device Certificate(s))')
+                     'devicecert generate -h '
+                     '(Generate Device Certificate(s))')
         else:
             return cacert, ca_private_key
 
@@ -303,7 +425,26 @@ def _get_and_save_ca_cert_from_input(outdir, filepath):
     log.debug("CA Cert saved")
     return ca_cert
 
-def _set_data(node_count, common_outdir, is_local, is_input_file):
+def _get_mqtt_endpoint(is_local, is_input_file):
+    log.debug("Getting mqtt endpoint")
+
+    if not is_input_file:
+        if is_local:
+            node_mfg = Node_Mfg(None)
+        else:
+            session = Session()
+            token = session.get_access_token()
+            if not token:
+                return None, None
+            node_mfg = Node_Mfg(token)
+    else:
+        node_mfg = Node_Mfg(None)
+        is_local = True
+    
+    endpoint = node_mfg.get_mqtthostname(is_local)
+    return endpoint
+
+def _set_data(node_count, common_outdir, is_local, is_input_file, endpoint):
 
     log.debug("Set data")
     log.debug('Generating node ids for '
@@ -350,12 +491,8 @@ def _set_data(node_count, common_outdir, is_local, is_input_file):
         if not node_ids_file:
             return None, None
         log.info("Node ids file saved at location: {}".format(node_ids_file))
-    else:
-        node_mfg = Node_Mfg(None)
-        is_local = True
 
     # Save mqtt endpoint into a file
-    endpoint = node_mfg.get_mqtthostname(is_local)
     endpoint_file = save_to_file(endpoint, common_outdir,
                                  dest_filename=MQTT_ENDPOINT_FILENAME)
     if not endpoint_file:
@@ -522,13 +659,17 @@ def generate_device_cert(vars=None):
             node_id_list_unique = [*set(node_id_list)]
             is_node_id_file = True
         
+         # Get mqttendpoint
+        endpoint = _get_mqtt_endpoint(is_local, is_node_id_file)
+
         # Generate CA Cert and CA Key
         ca_cert_filepath = vars['cacertfile']
         ca_key_filepath = vars['cakeyfile']
         log.debug("CA Cert filename input: {}".format(ca_cert_filepath))
         log.debug("CA Key filename input: {}".format(ca_key_filepath))
+
         if not ca_cert_filepath and not ca_key_filepath:
-            ca_cert, ca_private_key = generate_ca_cert(vars=vars, outdir=outdir, common_outdir=common_outdir, cli_call=False)
+            ca_cert, ca_private_key = generate_ca_cert(vars=vars, outdir=outdir, common_outdir=common_outdir, cli_call=False, mqtt_endpoint=endpoint)
         if ca_cert_filepath and not ca_key_filepath:
             raise Exception("CA key file is not provided")
         if ca_key_filepath and not ca_cert_filepath:
@@ -537,14 +678,48 @@ def generate_device_cert(vars=None):
         _print_keyboard_interrupt_message()
         log.info('Files generated will be stored '
                 'in directory: {}'.format(outdir))
+
+        # Extract the endpoint prefix using regex
+        ca_prefix = re.match(MQTT_PREFIX_SUBFOLDER_REGEX, endpoint)
+        if ca_prefix:
+            endpointprefix = ca_prefix.group(1)
+        
+        # Get paths for ca_certificates folder
+        ca_certificates_cwd = _set_output_dir_cacert(None, endpointprefix)
+        ca_cert_filepath_original = os.path.join(ca_certificates_cwd, CACERT_FILENAME)
+        ca_key_filepath_original = os.path.join(ca_certificates_cwd, CA_KEY_FILENAME)
+        
         # Get and save CA Certificate from file
         if len(ca_cert_filepath) != 0:
             ca_cert = _get_and_save_ca_cert_from_input(common_outdir, ca_cert_filepath)
+            if not os.path.exists(ca_cert_filepath_original):
+                ca_cert = get_ca_cert_from_file(ca_cert_filepath)
+                if not ca_cert:
+                    return
+                log.debug("CA Cert data recieved from input path")
+                # Save CA cert if given as input
+                ret_status = save_cert(ca_cert,ca_cert_filepath_original)
+                if not ret_status:
+                    return
+                log.debug("CA Cert saved in ca_certificates and common batch folder")
         
         # Get and save CA Private Key from file
         if len(ca_key_filepath) != 0:
             ca_private_key = _get_and_save_ca_key_from_input(common_outdir, ca_key_filepath)
-        node_ids_file, endpoint_file = _set_data(node_count, common_outdir, is_local, is_node_id_file)
+            if not os.path.exists(ca_key_filepath_original):
+                ca_private_key = get_ca_key_from_file(ca_key_filepath)
+                if not ca_private_key:
+                    return
+                log.debug("CA Key data recieved from input path")
+                # Save CA key if given as input
+                ret_status = save_key(ca_private_key, ca_key_filepath_original)
+                if not ret_status:
+                    return
+                log.debug("CA Key saved in ca_certificates and common batch folder")
+
+
+        node_ids_file, endpoint_file = _set_data(node_count, common_outdir, is_local, is_node_id_file, endpoint)
+
         if is_node_id_file:
             node_ids_file = input_node_ids_file
         if not node_ids_file and not endpoint_file:
