@@ -1,12 +1,23 @@
-- [**Introduction**](#introduction)
-- [**Setup Build Environment**](#setup-build-environment)
-- [**Workflow**](#workflow)
-- [**Usage**](#usage)
-- [**Account Operations**](#account-operations)
-- [**Device Certificate Operations**](#device-certificate-operations)
-- [**CA Certificate Operations**](#ca-certificate-operations)
-- [**Flashing**](#flashing)
-- [**Resources**](#resources)
+- [ESP RainMaker Admin CLI](#esp-rainmaker-admin-cli)
+  - [Introduction](#introduction)
+  - [Getting the Admin CLI](#getting-the-admin-cli)
+  - [Setup Build Environment](#setup-build-environment)
+    - [Operating System requirements](#operating-system-requirements)
+    - [Other requirements](#other-requirements)
+    - [Installing dependencies](#installing-dependencies)
+  - [Workflow](#workflow)
+  - [Usage](#usage)
+    - [Account Operations](#account-operations)
+      - [Server Config](#server-config)
+      - [Login](#login)
+    - [Device Certificate Operations](#device-certificate-operations)
+      - [Generate Device Certificates](#generate-device-certificates)
+      - [Register Device Certificates](#register-device-certificates)
+        - [Adding Tags](#adding-tags)
+      - [Check Device Certificate Registration Status](#check-device-certificate-registration-status)
+    - [CA Certificate Operations](#ca-certificate-operations)
+    - [Flashing](#flashing)
+  - [Resources](#resources)
 
 # ESP RainMaker Admin CLI
 
@@ -134,7 +145,8 @@ This will generate the private keys and certificates required by the RainMaker n
 > Notes:
 >
 > 1. This will also create the CA key and certificate that would be used for signing the device certificates. If you already have your own CA key and certificate, you can provide it explicitly.
-> 2. If you want the Provisioning QR codes to be generated as well, please use the --prov option, and pass appropriate transport. Generally, the default is "ble" for all chips that support BLE (ESP32, ESP32-C3) and "softap" for the ones that do not (ESP32-S2). However, this primarily depends on what you have used in your firmware.
+> 2. The created CA certificate and key will also be stored in a common folder named - 'ca_certificates' in the current working directory for reusing them for further device certificate generation. The key and the certificate will be stored in a sub folder under 'ca_certificates' named by the mqtt endpoint as prefix.
+> 3. If you want the Provisioning QR codes to be generated as well, please use the --prov option, and pass appropriate transport. Generally, the default is "ble" for all chips that support BLE (ESP32, ESP32-C3) and "softap" for the ones that do not (ESP32-S2). However, this primarily depends on what you have used in your firmware.
 
 Usage:
 
@@ -142,7 +154,7 @@ Usage:
 python rainmaker_admin_cli.py certs devicecert generate [-h] [--outdir <outdir>] [--count <count>]
                                                         [--cacertfile <cacertfile>] [--cakeyfile <cakeyfile>]
                                                         [--prov <prov_type>] [--fileid <fileid>]
-                                                        [--local <local>] [--inputfile <inputfile>]
+                                                        [--local <local>] [--inputfile <inputfile>] [--prefix_num <start> <length>]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -156,7 +168,9 @@ optional arguments:
   --cakeyfile <cakeyfile>
                         Path to file containing CA Private Key
   --prov <prov_type>    Provisioning type to generate QR code 
-                        (softap/ble)
+                        (softap/ble) Default value: ble
+  --prov_prefix <prov_prefix>    
+                        Provisioning name (requires changes in firmware) Default is PROV
   --fileid <fileid>     File identifier 
                         Used to identify file for each node uniquely (used as filename suffix)
                         Default: <node_id> (The node id's generated)
@@ -166,6 +180,8 @@ optional arguments:
   --local <local>       This is to determine whether or not to generate node ids locally.
                         Default: false
   --inputfile <csvfile> This is the node_ids.csv file containing pre-generated node ids.
+  --prefix_num <start> <length> 
+                        These prefix numbers start (counter) and length (minimum length of digits as prefix) are added for each node specific output filenames as index. For example --prefix 1 4 will set file or folder name prefixes as node-0001-<node_id>.<file_extension if it is a file>. The prefixes follow order of 0001, 0002, 0003, etc as per the start (counter) value and the number of nodes for which to generate the device certificates (--count). The default value of the index is 1 (start) and 6 (length).
 ```
 
 For generating the node Ids locally without the rainmaker login:
@@ -186,35 +202,38 @@ Example:
 Sample result for 2 nodes is as below :
 
       test
-      └── 2020-11-29
-         └── Mfg-00001
-            ├── bin
-            │   ├── node-00001-T2uNDXPMS9nj9vpKjs2QG8.bin
-            │   └── node-00002-dRagJ6GBim2HE5ENQ5nbYG.bin
-            ├── common
-            │   ├── ca.crt
-            │   ├── ca.key
-            │   ├── config.csv
-            │   ├── endpoint.txt
-            │   ├── node_certs.csv
-            │   ├── node_ids.csv
-            │   └── values.csv
-            ├── node_details
-            │   ├── node-00001-T2uNDXPMS9nj9vpKjs2QG8
-            │   │   ├── node.crt
-            │   │   ├── node.key
-            │   │   ├── node_info.csv
-            │   │   ├── qrcode.txt
-            │   │   └── random.txt
-            │   └── node-00002-dRagJ6GBim2HE5ENQ5nbYG
-            │       ├── node.crt
-            │       ├── node.key
-            │       ├── node_info.csv
-            │       ├── qrcode.txt
-            │       └── random.txt
-            └── qrcode
-                  ├── node-00001-T2uNDXPMS9nj9vpKjs2QG8.png
-                  └── node-00002-dRagJ6GBim2HE5ENQ5nbYG.png
+      └── 2024-09-29
+          └── Mfg-000001
+              ├── bin
+              │   ├── node-000001-T2uNDXPMS9nj9vpKjs2QG8.bin
+              │   └── node-000002-dRagJ6GBim2HE5ENQ5nbYG.bin
+              ├── common
+              │   ├── ca.crt
+              │   ├── ca.key
+              │   ├── config_tmp.csv
+              │   ├── config.csv
+              │   ├── endpoint.txt
+              │   ├── node_certs.csv
+              │   ├── node_ids.csv
+              │   ├── values_tmp.csv
+              │   └── values.csv
+              ├── csv
+              │   ├── node-000001-T2uNDXPMS9nj9vpKjs2QG8.csv
+              │   └── node-000002-dRagJ6GBim2HE5ENQ5nbYG.csv
+              ├── node_details
+              │   ├── node-000001-T2uNDXPMS9nj9vpKjs2QG8
+              │   │   ├── node.crt
+              │   │   ├── node.key
+              │   │   ├── qrcode.txt
+              │   │   └── random.txt
+              │   └── node-000002-dRagJ6GBim2HE5ENQ5nbYG
+              │       ├── node.crt
+              │       ├── node.key
+              │       ├── qrcode.txt
+              │       └── random.txt
+              └── qrcode
+                  ├── node-000001-T2uNDXPMS9nj9vpKjs2QG8.png
+                  └── node-000002-dRagJ6GBim2HE5ENQ5nbYG.png
 
 The output directory will have the following sub-directory structure:
 
@@ -233,14 +252,17 @@ The output directory contains the following files:
 	- `node_ids.csv` : CSV for all node ids generated in this batch.
 	- `config.csv` : The NVS configuration file as per the format defined [here](https://github.com/espressif/esp-idf/tree/master/tools/mass_mfg#csv-configuration-file) for the IDF Manufacturing Utility.
 	- `values.csv` : Master file with all the values for all the nodes as per the format defined [here](https://github.com/espressif/esp-idf/tree/master/tools/mass_mfg#master-value-csv-file) for the IDF Manufacturing Utility.
+  - The will be few '_tmp' files generated for values.csv and config.csv which will be used for internal purposes.
+- `csv/`:
+  - `node-<index>-<node_id>.bin`: For each device certificate, the corresponding csv file used as configuration to generate the binary.
+- `keys/`:
+  - `keys-node-<index>-<node_id>.bin`: For each device certificate, the corresponding encryption key (if encryption is enabled in [config](config/binary_config.ini)).the binary.
 - `node_details/`: All node details are stored in this directory.   
    Following details for each node are stored in `node_details/node-<index>-<node_id>` directory:
 	- `node.crt`: Device Certificates.
 	- `node.key`: Private key for each device certificate.
-	- `node_info.csv`: The csv file used as configuration to generate the binary.
 	- `qrcode.txt`: The QR code payload (used during provisioning, available only if --prov is given).
 	- `random.txt`: The random bytes information (used to generate device name and PoP, available only if --prov is given).
-	- `node_encr_key.bin`: Encryption key (if encryption is enabled in [config](config/binary_config.ini)).
 
 - `qrcode/`: QR code images for all nodes are stored in this directory (used during provisioning, available only if --prov is given). File format: `node-<index>-<node_id>.png`
 
@@ -318,13 +340,23 @@ The steps here would generally not be required. However, if you want to explicit
 Usage:
 
 ```
-python rainmaker_admin_cli.py certs cacert generate --outdir <outdir>
+python rainmaker_admin_cli.py certs cacert generate
 ```
 
 This will generate the CA key and certificate at following locations:
 
-- `<outdir>/<current_date>/Mfg-<no>/common/ca.key` 
-- `<outdir>/<current_date>/Mfg-<no>/common/ca.crt`
+- `ca_certificates/<mqttendpoint>/ca.key` 
+- `ca_certificates/<mqttendpoint>/ca.crt`
+
+```
+python rainmaker_admin_cli.py certs cacert generate --outdir <outdir>
+```
+This will generate the CA key and certificate at following locations:
+
+- `<outdir>/ca.key` 
+- `<outdir>/ca.crt`
+
+If there already exists CA a certificate and a key, then the existing ones are reused.
 
 These can be used for signing the device certificates by passing these via the `--cacertfile` and `--cakeyfile` options for `rainmaker_admin_cli.py certs devicecert generate`
 

@@ -7,3 +7,4 @@ pypng==0.0.20
 python-dateutil
 shortuuid
 regex
+esp-idf-nvs-partition-gen==0.1.6

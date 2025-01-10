@@ -15,6 +15,7 @@
 
 from __future__ import absolute_import, print_function, unicode_literals
 
+import csv
 from io import open
 import os
 import sys
@@ -34,6 +35,7 @@ try:
     from cryptography.x509.oid import NameOID
     from cryptography.hazmat.primitives.asymmetric import rsa
     from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.x509 import load_pem_x509_certificate
     from cryptography.hazmat.backends import default_backend
     from configparser import ConfigParser
     from builtins import str
@@ -59,7 +61,7 @@ CERT_VALIDATION_YEARS = 100
 
 class Mfg_Args():
     def __init__(self, dest_config_filename, dest_values_filename,
-                 data, outdir, keygen, file_id):
+                 data, outdir, keygen, file_id, prefix, prefix_num):
         self.conf = dest_config_filename
         self.values = dest_values_filename
         if data:
@@ -67,6 +69,9 @@ class Mfg_Args():
         else:
             self.size = data
         self.outdir = outdir
+        self.fileid = file_id
+        self.prefix = prefix
+        self.prefix_num = prefix_num
         # Set version=2, multipage blob support enabled
         self.version = 2
         self.keygen = keygen
@@ -75,13 +80,14 @@ class Mfg_Args():
         self.keyfile = None
         self.input = None
         self.output = None
-        self.fileid = file_id
+        self.key_protect_hmac = False
+        
         log.debug('Arguments set to send to manufacturing tool for '
                   'creating NVS partiton binaries')
         log.debug('conf: {}, values: {}, size: {}, '
                   'outdir: {}, version: {} '
                   'keygen: {}, inputkey: {}, keyfile: {}, '
-                  'input: {}, output: {}, fileid: {}'.format(
+                  'input: {}, output: {}, fileid: {}, prefix: {}, prefix_num: {}'.format(
                       self.conf,
                       self.values,
                       self.size,
@@ -92,7 +98,9 @@ class Mfg_Args():
                       self.keyfile,
                       self.input,
                       self.output,
-                      self.fileid))
+                      self.fileid,
+                      self.prefix,
+                      self.prefix_num))
 
 
 def save_to_file(file_data, output_dir,
@@ -222,46 +230,56 @@ def save_key(key, filepath):
                             'error: {} \n'.format(filepath, err)))
         log.error('Error: Failed to save key in file {}'.format(filepath))
 
-def _save_nodeid_and_cert_to_file(node_id, dev_cert, dest_csv_file):
+def _save_nodeid_cert_and_qrcode_to_file(node_id, dev_cert, qrcode_payload, dest_csv_file):
     '''
-    Save Node Id and Certificate to file
+    Save Node ID, Certificate, and QR code to file.
 
-    :param node_id: Node Id
+    :param node_id: Node ID
     :type node_id: str
 
     :param dev_cert: Device Certificate
     :type dev_cert: x509 Certificate
 
+    :param qrcode_payload: QR code payload, can contain commas
+    :type qrcode_payload: dict (or str if already serialized)
+
     :param dest_csv_file: Destination CSV file
-    :type dest_csv_file: str
+    :type dest_csv_file: str or file object (must support write operations)
     '''
     try:
         delimiter = ","
         newline = "\n"
         double_quote = "\""
-        dev_cert_bytes = dev_cert.public_bytes(
-            encoding=serialization.Encoding.PEM,)
+        
+        # Convert certificate to PEM format (string) and wrap it in quotes
+        dev_cert_bytes = dev_cert.public_bytes(encoding=serialization.Encoding.PEM)
         dev_cert_str = double_quote + dev_cert_bytes.decode('utf-8') + \
             double_quote
-        log.debug("Saving node id and cert to file: {}".format(
-            dest_csv_file))
-        new_data = [node_id, dev_cert_str]
+
+        # Serialize and wrap qrcode_payload in quotes
+        qrcode_str = double_quote + str(qrcode_payload).replace('"', '""') + double_quote
+
+        # Prepare new CSV data
+        log.debug("Saving node id, cert, and qrcode to file: {}".format(dest_csv_file))
+        new_data = [node_id, dev_cert_str, qrcode_str]
+
         data_to_write = delimiter.join(new_data) + newline
-        dest_csv_file.write(data_to_write)
-        log.debug("Node Id and Cert saved to file: {}".format(
-            dest_csv_file))
-        log.debug("Node id and certificate saved to file successfully")
+       # Writing to file
+        if isinstance(dest_csv_file, str): # If `dest_csv_file` is a string (if file path provided)
+            with open(dest_csv_file, 'a') as f:
+                f.write(data_to_write)
+        else:
+            dest_csv_file.write(data_to_write)  # If not a string, assume `dest_csv_file` is a file object and write directly
+
+        log.debug("Node Id, Cert, and QR code saved to file successfully")
         return True
+
     except FileError as file_err:
-        log.error(FileError('Error occurred while saving node id and cert to '
-                            'file {} error: {} \n'.format(
-                                dest_csv_file,
-                                file_err)))
+        log.error(FileError('Error occurred while saving node id, cert, and QR code to '
+                            'file {} error: {} \n'.format(dest_csv_file, file_err)))
     except Exception as err:
-        log.error(FileError('Error occurred while saving node id and cert to '
-                            'file {} error: {} \n'.format(
-                                dest_csv_file,
-                                err)))
+        log.error(FileError('Error occurred while saving node id, cert, and QR code to '
+                            'file {} error: {} \n'.format(dest_csv_file, err)))
         raise
 
 def _set_filename(filename_prefix=None, outdir=None, ext=None):
@@ -417,12 +435,22 @@ def _write_header_to_dest_csv(dest_csv_file):
     '''
     delimiter = ","
     newline = "\n"
-    header = ["node_id", "certs"]
+    header = ["node_id", "certs", "qrcode"]
     log.debug("Writing header to csv file: {}".format(header))
     keys_to_write = delimiter.join(header)
     keys_to_write = keys_to_write + newline
     dest_csv_file.write(keys_to_write)
     return dest_csv_file
+
+def load_existing_cert(cert_path):
+    with open(cert_path, "rb") as cert_file:
+        cert_data = cert_file.read()
+    return load_pem_x509_certificate(cert_data, default_backend())
+
+def load_existing_key(key_path):
+    with open(key_path, "rb") as key_file:
+        key_data = key_file.read()
+    return serialization.load_pem_private_key(key_data, password=None, backend=default_backend())
 
 def _generate_cert(subject_name=None, issuer_name=None,
                    public_key=None, ca_key=None, ca=False):
@@ -651,11 +679,11 @@ def generate_devicecert(outdir, ca_cert, ca_private_key,
         raise Exception(err)
 
 def _create_values_file(dest_values_file, id, node_id,
-                        endpoint, cert, cert_key, random_str, curr_extra_values):
+                        endpoint, cert, cert_key, random_str, qrcode_payload, curr_extra_values):
     log.debug("Writing to values file for manufacturing tool")
     log.debug('Writing data to values file: values_file:{} id:{} '
               'node_id:{} endpoint:{} cert:{} cert_key:{} random_str:{} '.format(
-                  dest_values_file, id, node_id, endpoint, cert, cert_key, random_str))
+                  dest_values_file, id, node_id, endpoint, cert, cert_key, random_str, qrcode_payload))
     values_file = open(dest_values_file, 'a')
     values_file.write(str(id))
     values_file.write(',')
@@ -668,6 +696,8 @@ def _create_values_file(dest_values_file, id, node_id,
     values_file.write(cert_key)
     values_file.write(',')
     values_file.write(random_str)
+    values_file.write(',')
+    values_file.write(f'"{str(qrcode_payload)}"')
     if curr_extra_values:
         for item in curr_extra_values:
             values_file.write(',')
@@ -676,6 +706,66 @@ def _create_values_file(dest_values_file, id, node_id,
     values_file.seek(0)
     values_file.close()
     log.debug("Done creating values file")
+
+# Function from mfg_gen, added here to verify extra config and values files
+def create_temp_files(args):
+    new_filenames = []
+    for filename in [args.conf, args.values]:
+        name, ext = os.path.splitext(filename)
+        new_filename = name + '_tmp' + ext
+        strip_blank_lines(filename, new_filename)
+        new_filenames.append(new_filename)
+    return new_filenames
+
+# Function from mfg_gen, added here to verify extra config and values files
+def strip_blank_lines(input_filename, output_filename):
+    with open(input_filename, 'r') as read_from, open(output_filename,'w', newline='') as write_to:
+        for line in read_from:
+            if not line.isspace():
+                write_to.write(line)
+
+# Function from mfg_gen, added here to verify extra config and values files
+def verify_file_format(args):
+    keys_in_config_file = []
+    keys_in_values_file = []
+    keys_repeat = []
+
+    # Verify files have csv extension
+    conf_name, conf_extension = os.path.splitext(args.conf)
+    if conf_extension != '.csv':
+        raise SystemExit('Error: config file: %s does not have the .csv extension.' % args.conf)
+    values_name, values_extension = os.path.splitext(args.values)
+    if values_extension != '.csv':
+        raise SystemExit('Error: values file: %s does not have the .csv extension.' % args.values)
+
+    # Verify files are not empty
+    if os.stat(args.conf).st_size == 0:
+        raise SystemExit('Error: config file: %s is empty.' % args.conf)
+    if os.stat(args.values).st_size == 0:
+        raise SystemExit('Error: values file: %s is empty.' % args.values)
+
+    # Extract keys from config file
+    with open(args.conf, 'r') as config_file:
+        config_file_reader = csv.reader(config_file, delimiter=',')
+        for config_data in config_file_reader:
+            if 'namespace' not in config_data:
+                keys_in_config_file.append(config_data[0])
+            if 'REPEAT' in config_data:
+                keys_repeat.append(config_data[0])
+
+    # Extract keys from values file
+    with open(args.values, 'r') as values_file:
+        values_file_reader = csv.reader(values_file, delimiter=',')
+        keys_in_values_file = next(values_file_reader)
+
+    # Verify file identifier exists in values file
+    if args.fileid:
+        if args.fileid not in keys_in_values_file:
+            raise SystemExit('Error: target_file_identifier: %s does not exist in values file.\n' % args.fileid)
+    else:
+        args.fileid = 1
+
+    return keys_in_config_file, keys_in_values_file, keys_repeat
 
 def verify_mfg_files(outdir, config_filename, values_filename, file_id):
     '''
@@ -688,18 +778,30 @@ def verify_mfg_files(outdir, config_filename, values_filename, file_id):
         None,
         None,
         None,
-        file_id)
+        file_id,
+        'node',
+        None)
     log.debug("Verifying mfg files")
-    # Only verify files, csv is not generated here
-    mfg_gen.generate(mfg_args)
-    log.debug("Mfg files verified")
+    # Verifying extra_config and extra_values files using mfg_gen functions as it is, to avoid generating their extra csv and binaries.
+    mfg_args.conf, mfg_args.values = create_temp_files(mfg_args)
 
-def gen_cert_bin(outdir, file_id):
+    # Verify input config and values file format
+    keys_in_config_file, keys_in_values_file, keys_repeat = verify_file_format(mfg_args)
+
+    log.debug("Extra config and values files verified")
+
+def gen_cert_bin(outdir, file_id, prefix_num_start, prefix_num_digits):
     '''
     Generate binaries for certificate(s)
 
     :param outdir: Output Directory
     :type outdir: str
+
+    :param prefix_num_start: Starting number for prefix (default is 1)
+    :type prefix_num_start: str
+
+    :param prefix_num_digits: Number of digits for prefix (default is 6)
+    :type prefix_num_digits: str
     '''
     log.debug("Setting config arguments for generating binaries")
     common_outdir = os.path.join(outdir, 'common')
@@ -725,9 +827,11 @@ def gen_cert_bin(outdir, file_id):
         config['DEFAULT'],
         outdir,
         keygen,
-        file_id)
+        file_id, 
+        'node',
+        (int(prefix_num_start),int(prefix_num_digits)))
     log.debug("Generating binaries")
-    mfg_gen.generate(mfg_args, create_csv=True)
+    mfg_gen.generate(mfg_args)
     log.debug("Binaries generated")
 
 def gen_hex_str(octets=64):
@@ -774,10 +878,10 @@ def _create_mfg_config_file(outdir):
     config_csv_file = [
         'rmaker_creds,namespace,',
         'node_id,data,binary',
-        'mqtt_host,file,binary',
+        'mqtt_host,data,binary',
         'client_cert,file,binary',
         'client_key,file,binary',
-        'random,file,hex2bin'
+        'random,data,hex2bin'
     ]
 
     # Check if additonal config file is given
@@ -798,7 +902,7 @@ def _create_mfg_config_file(outdir):
     log.debug("Manufacturing config file created")
     return dest_config_filename
 
-def generate_qrcode(random_hex, prov_type):
+def generate_qrcode(random_hex, prov_type, prov_prefix):
     '''
     Generate payload for QR code
     
@@ -807,6 +911,9 @@ def generate_qrcode(random_hex, prov_type):
 
     :param prov_type: Provisioning type
     :type prov_type: str
+
+    :param prov_prefix: Provisioning prefix
+    :type prov_prefix: str
     '''
     payload = {}
     # Set version as v1 (default)
@@ -814,7 +921,7 @@ def generate_qrcode(random_hex, prov_type):
     # Set pop as first 4 bytes (8 hex chars) of random info
     pop = random_hex[0:8]
     # Set provisioning name (last 3 bytes - 6 hex chars of random info)
-    prov_name = 'PROV_' + random_hex[-6:]
+    prov_name = prov_prefix+'_' + random_hex[-6:]
     # Set transport
     transport = prov_type
     # Generate payload
@@ -898,7 +1005,7 @@ def _print_status(cnt, step_cnt, msg=None):
             curr_time).strftime('%H:%M:%S')
         log.info('\n[{:<6}][Current Status] {}: {}'.format(msg, timestamp, str(cnt)))
 
-def _gen_prov_data(node_id_dir, node_id_dir_str, qrcode_outdir, random_hex_str, prov_type):
+def _gen_prov_data(node_id_dir, node_id_dir_str, qrcode_outdir, random_hex_str, prov_type, prov_prefix):
     '''
     Generate Provisioning data
     QR code image and string
@@ -909,7 +1016,7 @@ def _gen_prov_data(node_id_dir, node_id_dir_str, qrcode_outdir, random_hex_str, 
     # QR code image filename str is same as the current node id dirname str
     qrcode_img_str = node_id_dir_str
     # Generate payload (qr code payload) and png (qr code image)
-    qrcode_payload, qrcode = generate_qrcode(random_hex_str, prov_type)
+    qrcode_payload, qrcode = generate_qrcode(random_hex_str, prov_type, prov_prefix)
     log.debug("QR code and payload generated")
     # Save qrcode payload
     payload_file = save_to_file(qrcode_payload, node_id_dir, filename_prefix=qrcode_payload_str, ext=".txt")
@@ -921,7 +1028,7 @@ def _gen_prov_data(node_id_dir, node_id_dir_str, qrcode_outdir, random_hex_str, 
     if not qrcode_img_file:
         return
     log.debug("QR code image saved to file")
-    return True
+    return True, qrcode_payload
 
 def _init_file(common_outdir):
     log.debug("In init file")
@@ -970,7 +1077,7 @@ def _mfg_files_init(common_outdir, extra_keys_list):
     # Open values file (needed for generating binary)
     log.debug("Creating values file for manufacturing tool")
     # Set final values  keys
-    values_keys = 'id,node_id,mqtt_host,client_cert,client_key,random'
+    values_keys = 'id,node_id,mqtt_host,client_cert,client_key,random,qrcode'
     if extra_keys_list:
         # Get each comma seperated value in line
         for item in extra_keys_list:
@@ -1010,7 +1117,7 @@ def _certs_files_init(dest_filename):
     return dest_csv_file
 
 def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
-                       file_id, outdir, endpoint_file, prov_type, node_id_list_unique):
+                       file_id, outdir, endpoint, prov_type, prov_prefix, node_id_list_unique, prefix_num_start, prefix_num_digits):
     '''
     Generate and save device certificate
 
@@ -1029,12 +1136,17 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
     :param outdir: Output Directory
     :type outdir: str
 
-    :param endpoint_file: Endpoint filename
-    :type endpoint_file: str
+    :param endpoint: MQTT Endpoint
+    :type endpoint: str
+
+    :param prefix_num_start: Starting number for prefix (default is 1)
+    :type prefix_num_start: str
+
+    :param prefix_num_digits: Number of digits for prefix (default is 6)
+    :type prefix_num_digits: str
     '''
     file_id_suffix = None
-    max_filename_len = 6
-    cnt = 1
+    cnt = int(prefix_num_start)
     step_cnt = 100
     extra_keys = None
     extra_values_file_ptr = None
@@ -1101,9 +1213,8 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
                                                 file_id, extra_values_filename)) 
 
             # Create directory for node details for specific node id
-            zeros_prefix_len = max_filename_len - len(str(cnt))
-            zero_prefix_str = '0' * zeros_prefix_len
-            node_id_dir_str='node-' + zero_prefix_str + str(cnt) + "-" + file_id_suffix
+            prefix_number = f'{int(cnt):0{prefix_num_digits}}'
+            node_id_dir_str = 'node-' + str(prefix_number) + "-" + str(file_id_suffix)
             node_id_dir = os.path.join(node_details_outdir, node_id_dir_str)
             if not os.path.isdir(node_id_dir):
                 distutils.dir_util.mkpath(node_id_dir)
@@ -1140,16 +1251,25 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
             # Print status
             _print_status(cnt, step_cnt, msg='Random str (used as PoP) generated')
 
+            # Generate provisioning data
+            # QR code image and str
+            prov_status, qrcode_payload = _gen_prov_data(node_id_dir, node_id_dir_str, qrcode_outdir, random_hex_str, prov_type, prov_prefix)
+            if not prov_status:
+                return
+            # Print QR code status
+            _print_status(cnt, step_cnt, msg='QRcode payload and image generated')
+
             # Create values file for input to
             # Manufacturing Tool to generate binaries
             _create_values_file(
                 dest_values_filename,
                 cnt,
                 node_id,
-                endpoint_file,
+                endpoint,
                 cert_dest_filename,
                 key_dest_filename,
-                random_str_file,
+                random_hex_str,
+                qrcode_payload,
                 curr_extra_values)
 
             # Generate device certificate
@@ -1177,23 +1297,16 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
             # (used to upload and register the certificates)
             log.debug("Saving Node Id and Certificate to file: {}".format(
                 dest_filename))
-            ret_status = _save_nodeid_and_cert_to_file(
+            ret_status = _save_nodeid_cert_and_qrcode_to_file(
                 node_id,
                 dev_cert,
+                qrcode_payload,
                 dest_csv_file)
             if not ret_status:
                 return False
             log.debug("Number of certificates generated and saved")
             _print_status(cnt, step_cnt, msg='Certificates generated')
-            # Generate QR code
-            if prov_type:
-                # Generate provisioning data
-                # QR code image and str
-                prov_status = _gen_prov_data(node_id_dir, node_id_dir_str, qrcode_outdir, random_hex_str, prov_type)
-                if not prov_status:
-                    return
-                # Print QR code status
-                _print_status(cnt, step_cnt, msg='QRcode payload and image generated')
+            
             cnt += 1
         log.info("\nTotal certificates generated: {}".format(str(cnt - 1)))
         # Cleanup

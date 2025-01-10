@@ -187,6 +187,7 @@ class ArgParser():
             else:
                 parser.add_argument(arg["argname"],
                                     metavar=arg["metavar"],
+                                    nargs=arg["nargs"] if "nargs" in arg else None,
                                     default=arg["default"],
                                     help=arg["arghelp"])
 
@@ -288,7 +289,7 @@ COMMANDS = {
             {
                 "argname": "--prov",
                 "metavar": "<prov_type>",
-                "default": "",
+                "default": "ble",
                 "arghelp": 'Provisioning type to '
                            'generate QR code \n(softap/ble)',
                 "choices": ['softap', 'ble']
@@ -316,7 +317,20 @@ COMMANDS = {
                 "metavar": "<inputfile>",
                 "default": "",
                 "arghelp": 'This is the node_ids.csv file containing pre-generated node ids\n'
-            },           
+            },
+            {
+                "argname": "--prefix_num",
+                "metavar": ("<start>", "<length>"),
+                "nargs": 2,
+                "default": [1, 6],  # Default start=1 and length=6
+                "arghelp": 'Prefix number (counter) start and length (in digits) to be added for each output filename'
+            },
+            {
+                "argname": "--prov_prefix",
+                "metavar": "<prov_prefix>",
+                "default": "PROV",
+                "arghelp": 'Optional prefix in provisioning name (requires changes in firmware)',
+            }
         ]
     },
     "devicecert_register": {
