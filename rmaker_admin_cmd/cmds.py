@@ -666,8 +666,6 @@ def generate_device_cert(vars=None):
 
         # If local = true we will generate node Ids locally
         is_local = vars["local"]
-        if not is_local:
-            is_local = False
         
         is_node_id_file = False
         node_id_list_unique = []
@@ -884,7 +882,12 @@ def register_device_cert(vars=None):
             if is_present and not group_id:
                 log.error("Either provide the groupname with no parent or subgroup along with it's parent groupname")
                 return
-            
+
+        # Validate force and update_nodes
+        force = vars['force']
+        update_nodes = vars['update_nodes']
+        if force or update_nodes:
+            log.warn("\nWARNING: Ensure your backend version is 2.7.1 or higher if using the force or update_nodes flag.")         
         #validate tags if present        
         tags=vars['tags']
         if tags:
@@ -915,21 +918,21 @@ def register_device_cert(vars=None):
         node_model=vars['model']
         subtype = vars['subtype']
 
-        if not node_type and not node_model and not group_name and not subtype and not parent_group_name and not tags:
+        if not node_type and not node_model and not group_name and not subtype and not parent_group_name and not tags and not force and not update_nodes:
             conti=True
-            log.warn("\nWARNING: type, model, group name, subtype, tags and parent groupname are absent.")
+            log.warn("\nWARNING: type, model, group name, subtype, tags, force, update_nodes and parent groupname are absent.")
             while conti:
                 goahead=input("Do you wish to continue? (y/n):")
                 if goahead=="y" or goahead=="Y":
                     conti=False
                 elif goahead=="n" or goahead=="N":
-                    log.info("You can provide type, model, group name , subtype, parent groupname and tags using flags --type,--model,--groupname,--subtype,--parent_groupname,--tags. ")
+                    log.info("You can provide type, model, group name , subtype, force, parent groupname, update_nodes and tags using flags --type,--model,--groupname,--subtype, --force,--parent_groupname,--update_nodes ,--tags. ")
                     return
                 else:
                     log.error("Please enter a valid input.")
 
         # Register Device Certificate
-        request_id = node_mfg.register_cert_req(basefilename, md5_checksum, refresh_token, node_type, node_model, group_name, parent_group_id, parent_group_name, subtype, tags)
+        request_id = node_mfg.register_cert_req(basefilename, md5_checksum, refresh_token, node_type, node_model, group_name, parent_group_id, parent_group_name, subtype, tags, force, update_nodes)
         if not request_id:
             log.error("Request to register device certificate failed")
             return
@@ -976,6 +979,7 @@ def get_register_device_cert_status(vars=None):
         # Get current login session token
         # Re-login if session expired
         session = Session()
+        curr_email_id = session.get_curr_user_creds()
         token = session.get_access_token()
         if not token:
             log.error("Get device certificate registration request failed")
@@ -988,6 +992,8 @@ def get_register_device_cert_status(vars=None):
             vars['requestid'])
         log.info("Device certificate registration status: {}".format(
             cert_register_status))
+        log.info('You will receive the status on '
+                'your email-id: {}'.format(curr_email_id))
         return
 
     except KeyboardInterrupt:

@@ -154,7 +154,7 @@ Usage:
 python rainmaker_admin_cli.py certs devicecert generate [-h] [--outdir <outdir>] [--count <count>]
                                                         [--cacertfile <cacertfile>] [--cakeyfile <cakeyfile>]
                                                         [--prov <prov_type>] [--fileid <fileid>]
-                                                        [--local <local>] [--inputfile <inputfile>] [--prefix_num <start> <length>]
+                                                        [--local] [--inputfile <inputfile>] [--prefix_num <start> <length>]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -177,18 +177,18 @@ optional arguments:
                         If provided, eg. `mac_addr`(MAC address),
                         must be part of ADDITIONAL_VALUES file (provided in config)
                         and must have <count> values in the file (for each node)
-  --local <local>       This is to determine whether or not to generate node ids locally.
-                        Default: false
+  --local       This is to determine whether or not to generate node ids locally.
+                        Default: false if not specified.
   --inputfile <csvfile> This is the node_ids.csv file containing pre-generated node ids.
   --prefix_num <start> <length> 
                         These prefix numbers start (counter) and length (minimum length of digits as prefix) are added for each node specific output filenames as index. For example --prefix 1 4 will set file or folder name prefixes as node-0001-<node_id>.<file_extension if it is a file>. The prefixes follow order of 0001, 0002, 0003, etc as per the start (counter) value and the number of nodes for which to generate the device certificates (--count). The default value of the index is 1 (start) and 6 (length).
 ```
 
 For generating the node Ids locally without the rainmaker login:
-`python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test --local true`
+`python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test --local`
 
 For generating the node certificates by providing pre-generated node ids csv file:
-`python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test --local true --inputfile <node_ids.csv>`
+`python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test --local --inputfile <node_ids.csv>`
 > Note that in this command, count and local argument will be ignored and inputfile will get the precendence.
 
 
@@ -197,7 +197,7 @@ For simplest use case, the usage is as given below. If you want to add some cust
 > Note that it is better to first create a small set of certificates, say 5, so that you get an idea about how the tool works.
 
 Example:
-`python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test --local true --inputfile <node_ids.csv>`
+`python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test --local --inputfile <node_ids.csv>`
 
 Sample result for 2 nodes is as below :
 
@@ -281,6 +281,8 @@ python rainmaker_admin_cli.py certs devicecert register [-h] --inputfile <csvfil
                                                         [--groupname <nodegroupname>] [--type <nodetype>]
                                                         [--model <nodemodel>] [--parent_groupname <parent_groupname>][--subtype <nodesubtype>]
                                                         [--tags <nodetags>]
+                                                        [--force]
+                                                        [--update_nodes]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -294,6 +296,9 @@ optional arguments:
                         Name of the parent group to which this newly created group will be a child group      
   --subtype <nodesubtype> Node SubType
   --tags <nodetags> Comma separated strings of tags to be attached to the nodes.(eg: location:Pune,office:espressif)
+  --force  Whether to ignore the error for duplicate node registration, also updates the existing certificates
+  --update_nodes Whether to skip registration of the device certificates and only add the type, model, subtype and tags to the nodes.
+  --update_nodes and --force If both are given, only the existing nodes will be updated with the new type, model, subtype and tags, Also the certificates will be updated.New nodes will be skipped.
 ```
 
 For the example in device certificate generation section the node_certs_file file would be `test/2020-11-29/Mfg-00001/common/node_certs.csv`.
@@ -322,7 +327,7 @@ After passing `--tags loc:@city`,
 
 #### Check Device Certificate Registration Status
 
-The certificate registration process can take significant time. One it is finished, the super admin user will get an email with the status. The same can also be checked using the `getcertstatus` command.
+The certificate registration process can take significant time. Once it is finished, the super admin user will get an email with the status. The same can also be checked using the `getcertstatus` command.
 
 Usage:
 
