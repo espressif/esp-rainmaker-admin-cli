@@ -899,10 +899,13 @@ def register_device_cert(vars=None):
                 return
             
         # Get URL to upload Device Certificate to
-        cert_upload_url = node_mfg.get_cert_upload_url(basefilename)
+        cert_upload_url,request_id = node_mfg.get_cert_upload_url(basefilename)
         if not cert_upload_url:
             log.error("Upload Device Certificate Failed.")
             return
+        
+        if not request_id:
+            log.warn("\nWARNING: Your cloud version appears to be below 2.8.0. Please upgrade to access the latest changes. Continuing with the older version.")
 
         # Upload Device Certificate file to S3 Bucket
         cert_upload = upload_cert(cert_upload_url, vars['inputfile'])
@@ -932,8 +935,8 @@ def register_device_cert(vars=None):
                     log.error("Please enter a valid input.")
 
         # Register Device Certificate
-        request_id = node_mfg.register_cert_req(basefilename, md5_checksum, refresh_token, node_type, node_model, group_name, parent_group_id, parent_group_name, subtype, tags, force, update_nodes)
-        if not request_id:
+        job_request_id = node_mfg.register_cert_req(basefilename, md5_checksum, refresh_token, node_type, node_model, group_name, parent_group_id, parent_group_name, subtype, tags, force, update_nodes, request_id)
+        if not job_request_id:
             log.error("Request to register device certificate failed")
             return
         else:
@@ -946,7 +949,7 @@ def register_device_cert(vars=None):
                  'python rainmaker_admin_cli.py certs devicecert getcertstatus '
                  '--requestid {} '
                  '(Get Device Certificate Registration '
-                 'Status)'.format(request_id))
+                 'Status)'.format(job_request_id))
     
     except KeyboardInterrupt:
         log.error("\nRegister device certificate failed")
