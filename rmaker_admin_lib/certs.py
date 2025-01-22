@@ -25,6 +25,7 @@ import binascii
 import datetime
 import pyqrcode
 import distutils.dir_util
+from rmaker_admin_lib.constants import CSV_EXTENSION, NAMESPACE_KEY, REPEAT_TAG
 from tools import mfg_gen
 from rmaker_admin_lib.logger import log
 from dateutil.relativedelta import relativedelta
@@ -103,7 +104,9 @@ class Mfg_Args():
                       self.prefix_num))
 
 
-def save_to_file(file_data, output_dir, filename_prefix=None, dest_filename=None, ext='.csv'):
+def save_to_file(file_data, output_dir,
+                 filename_prefix=None, dest_filename=None,
+                 ext=CSV_EXTENSION):
     '''
     Save data to a file, with a special case for node IDs.
 
@@ -349,6 +352,16 @@ def verify_fileid_count(extra_values_file, fileid, count):
     if count > (len(rows) - 1):
         return False
     return True
+
+def count_extra_values_file_rows(extra_values_file):
+    '''
+    Count the number of entries in the values file for node count
+    '''
+    log.debug("Verify fileid count")
+    with open(extra_values_file, 'r') as values_file:
+        rows = values_file.readlines()
+    # first row will be of all keys (column names)
+    return len(rows)-1
 
 def _check_file_format(rows_in_file):
     '''
@@ -746,10 +759,11 @@ def _create_values_file(dest_values_file, id, node_id,
 def create_temp_files(args):
     new_filenames = []
     for filename in [args.conf, args.values]:
-        name, ext = os.path.splitext(filename)
-        new_filename = name + '_tmp' + ext
-        strip_blank_lines(filename, new_filename)
-        new_filenames.append(new_filename)
+        if filename:  # Check if the file is present (handling case when extra_config.csv is None)
+            name, ext = os.path.splitext(filename)
+            new_filename = name + '_tmp' + ext
+            strip_blank_lines(filename, new_filename)
+            new_filenames.append(new_filename)
     return new_filenames
 
 # Function from mfg_gen, added here to verify extra config and values files
@@ -765,38 +779,50 @@ def verify_file_format(args):
     keys_in_values_file = []
     keys_repeat = []
 
-    # Verify files have csv extension
-    conf_name, conf_extension = os.path.splitext(args.conf)
-    if conf_extension != '.csv':
-        raise SystemExit('Error: config file: %s does not have the .csv extension.' % args.conf)
-    values_name, values_extension = os.path.splitext(args.values)
-    if values_extension != '.csv':
-        raise SystemExit('Error: values file: %s does not have the .csv extension.' % args.values)
+    # Verify and process the config file if present
+    if args.conf:
+        print("Verifying given extra config file")
+        # Verify config file has .csv extension
+        conf_name, conf_extension = os.path.splitext(args.conf)
+        if conf_extension != CSV_EXTENSION:
+            raise SystemExit('Error: config file: %s does not have the .csv extension.' % args.conf)
 
-    # Verify files are not empty
-    if os.stat(args.conf).st_size == 0:
-        raise SystemExit('Error: config file: %s is empty.' % args.conf)
-    if os.stat(args.values).st_size == 0:
-        raise SystemExit('Error: values file: %s is empty.' % args.values)
+        # Verify config file is not empty
+        if os.stat(args.conf).st_size == 0:
+            raise SystemExit('Error: config file: %s is empty.' % args.conf)
 
-    # Extract keys from config file
-    with open(args.conf, 'r') as config_file:
-        config_file_reader = csv.reader(config_file, delimiter=',')
-        for config_data in config_file_reader:
-            if 'namespace' not in config_data:
-                keys_in_config_file.append(config_data[0])
-            if 'REPEAT' in config_data:
-                keys_repeat.append(config_data[0])
+        # Extract keys from config file
+        with open(args.conf, 'r') as config_file:
+            config_file_reader = csv.reader(config_file, delimiter=',')
+            for config_data in config_file_reader:
+                if NAMESPACE_KEY not in config_data:
+                    keys_in_config_file.append(config_data[0])
+                if REPEAT_TAG in config_data:
+                    keys_repeat.append(config_data[0])
 
-    # Extract keys from values file
-    with open(args.values, 'r') as values_file:
-        values_file_reader = csv.reader(values_file, delimiter=',')
-        keys_in_values_file = next(values_file_reader)
+    # Verify and process the values file if present
+    if args.values:
+        print("Verifying given extra values file")
+        # Verify values file has .csv extension
+        values_name, values_extension = os.path.splitext(args.values)
+        if values_extension != CSV_EXTENSION:
+            raise SystemExit('Error: values file: %s does not have the .csv extension.' % args.values)
+
+        # Verify values file is not empty
+        if os.stat(args.values).st_size == 0:
+            raise SystemExit('Error: values file: %s is empty.' % args.values)
+
+        # Extract keys from values file
+        with open(args.values, 'r') as values_file:
+            values_file_reader = csv.reader(values_file, delimiter=',')
+            keys_in_values_file = next(values_file_reader)
 
     # Verify file identifier exists in values file
-    if args.fileid:
+    if args.fileid and args.values:
         if args.fileid not in keys_in_values_file:
-            raise SystemExit('Error: target_file_identifier: %s does not exist in values file.\n' % args.fileid)
+            raise SystemExit(
+                'Error: target_file_identifier: %s does not exist in values file.\n' % args.fileid
+            )
     else:
         args.fileid = 1
 
@@ -817,9 +843,24 @@ def verify_mfg_files(outdir, config_filename, values_filename, file_id):
         'node',
         None)
     log.debug("Verifying mfg files")
-    # Verifying extra_config and extra_values files using mfg_gen functions as it is, to avoid generating their extra csv and binaries.
-    mfg_args.conf, mfg_args.values = create_temp_files(mfg_args)
+    
+    # Verifying extra_config and extra_values files
+    temp_files = create_temp_files(mfg_args)
 
+    # Assign values only if they exist
+    if len(temp_files) == 2:  # Both files were processed
+        mfg_args.conf, mfg_args.values = temp_files
+    elif len(temp_files) == 1:  # Only one file was processed
+        if mfg_args.conf:  # Check which file was processed
+            mfg_args.conf = temp_files[0]
+            mfg_args.values = None
+        else:
+            mfg_args.conf = None
+            mfg_args.values = temp_files[0]
+    else:  # No files were processed
+        mfg_args.conf = None
+        mfg_args.values = None
+        log.debug("No files were processed")
     # Verify input config and values file format
     keys_in_config_file, keys_in_values_file, keys_repeat = verify_file_format(mfg_args)
 

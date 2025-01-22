@@ -188,8 +188,8 @@ For generating the node Ids locally without the rainmaker login:
 `python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test --local`
 
 For generating the node certificates by providing pre-generated node ids csv file:
-`python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test --local --inputfile <node_ids.csv>`
-> Note that in this command, count and local argument will be ignored and inputfile will get the precendence.
+`python rainmaker_admin_cli.py certs devicecert generate --prov ble --outdir test --inputfile <node_ids.csv>`
+> Note: In this command, the count and local arguments will be ignored, and the inputfile will take precedence, determining the number of Node IDs for which device certificates will be generated.
 > - The input file must be a CSV with a header row (field names as the first row). 
 > - Node IDs will only be retrieved from rows under a single column named **`node_id`**.
 
@@ -198,7 +198,7 @@ For simplest use case, the usage is as given below. If you want to add some cust
 > Note that it is better to first create a small set of certificates, say 5, so that you get an idea about how the tool works.
 
 Example:
-`python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test --local --inputfile <node_ids.csv>`
+`python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test --local`
 
 Sample result for 2 nodes is as below :
 
@@ -270,6 +270,15 @@ The output directory contains the following files:
 **Adding Custom Data**
 
 There could often be a requirement to add some custom data to the nvs binaries generated. Such custom data can be added using the formats specified by the ESP IDF [Manufacturing Utility](https://github.com/espressif/esp-idf/tree/master/tools/mass_mfg). The [config file](https://github.com/espressif/esp-idf/tree/master/tools/mass_mfg#csv-configuration-file) and [values file](https://github.com/espressif/esp-idf/tree/master/tools/mass_mfg#master-value-csv-file) can be given as input by setting the `ADDITIONAL_CONFIG` and `ADDITIONAL_VALUES` fields in [config/binary_config.ini](config/binary_config.ini). Please check out samples for such files at [samples/extra_config.csv](samples/extra_config.csv) and [samples/extra_values.csv](samples/extra_values.csv)
+
+> **Note:**  
+> - When a valid values CSV file is specified in the `ADDITIONAL_VALUES` field, the `--count` argument is ignored, and the number of Node Ids for generating certificates is determined by the number of rows (excluding the header) in the provided CSV file.  
+> - If a `node_ids.csv` file is provided via the `--input_file` argument, the row count from the `ADDITIONAL_VALUES` CSV file is ignored, and the node count is determined by the `node_ids.csv` file instead.  
+> - The precedence for determining the node count for device certificate generation is as follows:  
+>   1. `node_ids.csv` file passed via `--input_file`  
+>   2. Values CSV file specified in the `ADDITIONAL_VALUES` field  
+>   3. The `--count` argument (used only if neither of the above is provided).  
+
        
 #### Register Device Certificates
 

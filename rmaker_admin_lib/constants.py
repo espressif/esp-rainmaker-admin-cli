@@ -12,6 +12,9 @@ COMMA = ","
 VERSION = 'v1'
 MQTT_PREFIX_SUBFOLDER_REGEX = r'([a-zA-Z0-9]+)-ats\.iot'
 BLUETOOTH = 'BLE'
+CSV_EXTENSION = '.csv'
+NAMESPACE_KEY = 'namespace'
+REPEAT_TAG = 'REPEAT'
 
 try:
     if os.path.exists(SERVER_CONFIG_FILE):
