@@ -103,14 +103,12 @@ class Mfg_Args():
                       self.prefix_num))
 
 
-def save_to_file(file_data, output_dir,
-                 filename_prefix=None, dest_filename=None,
-                 ext='.csv'):
+def save_to_file(file_data, output_dir, filename_prefix=None, dest_filename=None, ext='.csv'):
     '''
-    Save text data to file
+    Save data to a file, with a special case for node IDs.
 
     :param file_data: Data to save to file
-    :type file_data: str
+    :type file_data: str or bytes
 
     :param output_dir: Output directory to store data
     :type output_dir: str
@@ -120,18 +118,26 @@ def save_to_file(file_data, output_dir,
 
     :param dest_filename: Name of destination file
     :type dest_filename: str
+
+    :param ext: File extension (default is '.csv')
+    :type ext: str
+
+    :return: Path of the saved file
+    :rtype: str
     '''
     file_mode = 'wb+'
     try:
+        log.debug("file_data is : {}".format(file_data))
         dest_filepath = None
 
+        # Ensure the output directory exists
         if not os.path.isdir(output_dir):
             os.makedirs(output_dir)
             log.debug("Directory created: {}".format(output_dir))
 
+        # If no destination filename is provided, use the _set_filename function
         if not dest_filename:
-            dest_filepath = _set_filename(filename_prefix=filename_prefix,
-                                          outdir=output_dir, ext=ext)
+            dest_filepath = _set_filename(filename_prefix=filename_prefix, outdir=output_dir, ext=ext)
             if not dest_filepath:
                 return None
         else:
@@ -140,34 +146,51 @@ def save_to_file(file_data, output_dir,
         log.debug("Destination filename set: {}".format(dest_filepath))
         log.debug("Saving in output directory: {}".format(output_dir))
 
-        # Write image to file (used for qrcode)
-        if ext == '.png':
-            with open(dest_filepath, 'wb+') as f:
-                file_data.png(f, scale=4)
+        # Special case for saving node IDs in a CSV format
+        if filename_prefix == "node_ids" and ext == '.csv':
+            # Decode file_data if it is bytes
+            if isinstance(file_data, bytes):
+                file_data = file_data.decode('utf8')
+
+            # Split node IDs by comma and remove empty entries
+            node_ids = [node_id.strip() for node_id in file_data.split(',') if node_id.strip()]
+            log.debug("Node IDs to save: {}".format(node_ids))
+
+            # Write node IDs to CSV file with a header
+            with open(dest_filepath, mode='w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(['node_id'])  # Write header
+                for node_id in node_ids:
+                    writer.writerow([node_id])  # Write each node ID in a new row
+            log.debug("Node IDs successfully written to file")
+            return dest_filepath
+        # General case for other data (write file only if it's not node_ids)
         else:
-            try:
-                # Write file data to file
-                if not isinstance(file_data, bytes):
-                    log.debug("Converting data to bytes")
-                    file_data = file_data.encode('utf8')
-            except AttributeError:
-                log.debug("Converting data to json")
-                file_data = json.dumps(file_data)
-                file_mode = 'w+'
-
-            log.debug("Writing data to file")
-            with open(dest_filepath, file_mode) as f:
+            if ext == '.png':
+                with open(dest_filepath, 'wb+') as f:
+                    file_data.png(f, scale=4)
+            else:
                 try:
-                    f.write(file_data)
-                except TypeError:
-                    f.write(file_data.decode('utf8'))
+                    if not isinstance(file_data, bytes):
+                        log.debug("Converting data to bytes")
+                        file_data = file_data.encode('utf8')
+                except AttributeError:
+                    log.debug("Converting data to JSON")
+                    file_data = json.dumps(file_data)
+                    file_mode = 'w+'
 
-        return dest_filepath
+                log.debug("Writing data to file")
+                with open(dest_filepath, file_mode) as f:
+                    try:
+                        f.write(file_data)
+                    except TypeError:
+                        f.write(file_data.decode('utf8'))
+
+            log.debug("Data successfully written to file: {}".format(dest_filepath))
+            return dest_filepath
+
     except Exception as err:
-        log.error(FileError('Error occurred while saving node ids to '
-                            'file {} error: {} \n'.format(
-                                dest_filepath,
-                                err)))
+        log.error(f"Error occurred while saving data to file {dest_filepath}: {err}")
         raise
 
 def save_cert(cert, filepath):
@@ -404,26 +427,38 @@ def get_ca_cert_from_file(filename):
 
 def get_nodeid_from_file(filename):
     '''
-    Get Node Id from file
+    Get Node Id from the specified "node_id" column in a CSV file.
 
-    :param filename: Filename containing Node Ids
+    :param filename: Filename containing Node Ids in a column named "node_id"
     :type filename: str
+    :return: List of Node IDs from the "node_id" column
+    :rtype: list
     '''
     try:
-        log.debug("Getting node id from file: {}".format(filename))
-        delimiter = ","
-        with open(filename) as csvfile:
-            rows_in_file = csvfile.readlines()
-            file_data = _check_file_format(rows_in_file)
-            log.debug("File data received: {}".format(file_data))
-            nodeid_list = file_data[0].split(delimiter)
-            log.debug("Node Ids list: {}".format(nodeid_list))
-            nodeid_list = _check_file_format(nodeid_list)
-            log.debug("Node Ids received from file: {}".format(nodeid_list))
-            return nodeid_list
+        log.debug("Getting node ids from file: {}".format(filename))
+
+        nodeid_list = []
+
+        # Open the file and read it using the csv module
+        with open(filename, mode='r') as csvfile:
+            reader = csv.DictReader(csvfile)  # Reads the file as a dictionary with headers
+            log.debug("CSV headers: {}".format(reader.fieldnames))
+            
+            # Check if the required "node_id" column is present
+            if 'node_id' not in reader.fieldnames:
+                raise ValueError(f"'node_id' column not found in file: {filename}")
+            
+            # Extract all values from the "node_id" column
+            for row in reader:
+                node_id = row['node_id'].strip()  # Strip whitespace from the value
+                if node_id:  # Add non-empty node IDs to the list
+                    nodeid_list.append(node_id)
+        
+        log.debug("Node IDs extracted: {}".format(nodeid_list))
+        return nodeid_list
+
     except Exception as err:
-        log.error(FileError('Error occurred while getting node ids from '
-                            'file {}\n{}'.format(filename, err)))
+        log.error(f"Error occurred while getting node ids from file {filename}: {err}")
         raise
 
 def _write_header_to_dest_csv(dest_csv_file):

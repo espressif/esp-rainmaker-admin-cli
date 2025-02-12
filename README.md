@@ -153,7 +153,7 @@ Usage:
 ```
 python rainmaker_admin_cli.py certs devicecert generate [-h] [--outdir <outdir>] [--count <count>]
                                                         [--cacertfile <cacertfile>] [--cakeyfile <cakeyfile>]
-                                                        [--prov <prov_type>] [--fileid <fileid>]
+                                                        [--prov <prov_type>] [--prov_prefix <prov_prefix>] [--fileid <fileid>]
                                                         [--local] [--inputfile <inputfile>] [--prefix_num <start> <length>]
 
 optional arguments:
@@ -190,7 +190,8 @@ For generating the node Ids locally without the rainmaker login:
 For generating the node certificates by providing pre-generated node ids csv file:
 `python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test --local --inputfile <node_ids.csv>`
 > Note that in this command, count and local argument will be ignored and inputfile will get the precendence.
-
+> - The input file must be a CSV with a header row (field names as the first row). 
+> - Node IDs will only be retrieved from rows under a single column named **`node_id`**.
 
 For simplest use case, the usage is as given below. If you want to add some custom data or customise some other parameters, please refer the subsequent sections.
 
