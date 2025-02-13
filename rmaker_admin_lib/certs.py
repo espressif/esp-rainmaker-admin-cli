@@ -276,11 +276,13 @@ def _save_nodeid_cert_and_qrcode_to_file(node_id, dev_cert, qrcode_payload, dest
         
         # Convert certificate to PEM format (string) and wrap it in quotes
         dev_cert_bytes = dev_cert.public_bytes(encoding=serialization.Encoding.PEM)
-        dev_cert_str = double_quote + dev_cert_bytes.decode('utf-8') + \
-            double_quote
+        dev_cert_str = double_quote + dev_cert_bytes.decode('utf-8').replace('"', '""') + double_quote
 
-        # Serialize and wrap qrcode_payload in quotes
-        qrcode_str = double_quote + str(qrcode_payload).replace('"', '""') + double_quote
+        # Serialize qrcode_payload and ensure it is properly escaped
+        if isinstance(qrcode_payload, dict):
+            qrcode_str = double_quote + json.dumps(qrcode_payload).replace('"', '""') + double_quote
+        else:
+            qrcode_str = double_quote + str(qrcode_payload).replace('"', '""') + double_quote
 
         # Prepare new CSV data
         log.debug("Saving node id, cert, and qrcode to file: {}".format(dest_csv_file))
@@ -717,29 +719,37 @@ def _create_values_file(dest_values_file, id, node_id,
                         endpoint, cert, cert_key, random_str, qrcode_payload, curr_extra_values):
     log.debug("Writing to values file for manufacturing tool")
     log.debug('Writing data to values file: values_file:{} id:{} '
-              'node_id:{} endpoint:{} cert:{} cert_key:{} random_str:{} '.format(
+              'node_id:{} endpoint:{} cert:{} cert_key:{} random_str:{} qrcode_payload:{}'.format(
                   dest_values_file, id, node_id, endpoint, cert, cert_key, random_str, qrcode_payload))
-    values_file = open(dest_values_file, 'a')
-    values_file.write(str(id))
-    values_file.write(',')
-    values_file.write(str(node_id))
-    values_file.write(',')
-    values_file.write(endpoint)
-    values_file.write(',')
-    values_file.write(cert)
-    values_file.write(',')
-    values_file.write(cert_key)
-    values_file.write(',')
-    values_file.write(random_str)
-    values_file.write(',')
-    values_file.write(f'"{str(qrcode_payload)}"')
-    if curr_extra_values:
-        for item in curr_extra_values:
-            values_file.write(',')
-            values_file.write(item)
-    values_file.write("\n")
-    values_file.seek(0)
-    values_file.close()
+    
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(dest_values_file), exist_ok=True)
+    
+    # Open the file in append mode
+    with open(dest_values_file, mode='a', newline='') as csvfile:
+        writer = csv.writer(csvfile, quotechar='"', quoting=csv.QUOTE_MINIMAL)
+
+        # Format the qrcode_payload correctly
+        formatted_qrcode = json.dumps(qrcode_payload)  # JSON-encoded string
+
+        # Create the row
+        row = [
+            id,
+            node_id,
+            endpoint,
+            cert,
+            cert_key,
+            random_str,
+            formatted_qrcode  # Enclosed properly
+        ]
+
+        # Append curr_extra_values if they exist
+        if curr_extra_values:
+            row.extend(curr_extra_values)
+
+        # Write the row to the CSV file
+        writer.writerow(row)
+
     log.debug("Done creating values file")
 
 # Function from mfg_gen, added here to verify extra config and values files
