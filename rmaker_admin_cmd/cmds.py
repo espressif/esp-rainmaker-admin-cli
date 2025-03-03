@@ -531,8 +531,7 @@ def _extra_config_files_checks(outdir, extra_config, extra_values, file_id):
     log.debug("Extra config file checks")
     set_to_false = None
     if extra_config and not extra_values:
-        log.info('ADDITIONAL_VALUES file must also be provided in config '
-                    'alongwith ADDITIONAL_CONFIG file.')
+        log.info('ADDITIONAL_VALUES file must also be provided in config along with ADDITIONAL_CONFIG file.')
         set_to_false = False
     if file_id and file_id in ['node_id']:
         log.info('`node_id` is the default fileid. '
@@ -549,7 +548,7 @@ def _extra_config_files_checks(outdir, extra_config, extra_values, file_id):
                     'alongwith ADDITIONAL_VALUES file in config.')
         set_to_false = False
     '''
-    if extra_config or extra_values:
+    if extra_values:
         log.debug("Verifying mfg files input")
         # Verify mfg files
         verify_mfg_files(outdir, extra_config, extra_values, file_id)
@@ -557,18 +556,6 @@ def _extra_config_files_checks(outdir, extra_config, extra_values, file_id):
         return False
     return True
 
-def _fileid_check(file_id, node_count, extra_values):
-    log.debug("Fileid check")
-    if file_id:
-        # Verify fileid count
-        ret_status = verify_fileid_count(extra_values, file_id, node_count)
-        if not ret_status:
-            log.error("Count: {} provided is greater than the values for fileid: {} in file: {}".format(
-                node_count,
-                file_id,
-                extra_values))
-            return False
-    return True
 
 def generate_device_cert(vars=None):
     '''
@@ -608,11 +595,18 @@ def generate_device_cert(vars=None):
     try:
         log.debug("Generate device certificates")
         node_count = int(vars['count'])
-        ret_status = _cli_arg_check(node_count, '--count <count>',
-                                    err_msg='<count> must be > 0')
-        if not ret_status:
+
+        extra_config = get_param_from_config('ADDITIONAL_CONFIG')
+        extra_values = get_param_from_config('ADDITIONAL_VALUES')
+
+        if not node_count and not extra_values:
+            log.info('Atleast ADDITIONAL_VALUES file must be provided in config or count must be provided.')
             return
-        
+        elif node_count <= 0 and not extra_values:
+            ret_status = _cli_arg_check(None, '--count <count>',
+                                    err_msg='<count> must be > 0')
+            if not ret_status:
+                return
         # Init
         file_id = vars['fileid']
         if len(file_id) == 0:
@@ -630,16 +624,12 @@ def generate_device_cert(vars=None):
         outdir = _set_output_dir(vars['outdir'])
         
         # Extra config files checks
-        extra_config = get_param_from_config('ADDITIONAL_CONFIG')
-        extra_values = get_param_from_config('ADDITIONAL_VALUES')
         ret_status = _extra_config_files_checks(outdir, extra_config, extra_values, file_id)
         if not ret_status:
             return
         
-        # Fileid checks
-        ret_status = _fileid_check(file_id, node_count, extra_values)
-        if not ret_status:
-            return
+        if extra_values:
+            node_count = count_extra_values_file_rows(extra_values)
         
         # Initialize start and length for prefixing filenames
         prefix_num = vars.get('prefix_num')
