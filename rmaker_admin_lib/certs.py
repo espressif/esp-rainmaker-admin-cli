@@ -791,7 +791,7 @@ def verify_file_format(args):
 
     # Verify and process the config file if present
     if args.conf:
-        print("Verifying given extra config file")
+        log.info("Verifying given extra config file")
         # Verify config file has .csv extension
         conf_name, conf_extension = os.path.splitext(args.conf)
         if conf_extension != CSV_EXTENSION:
@@ -812,7 +812,7 @@ def verify_file_format(args):
 
     # Verify and process the values file if present
     if args.values:
-        print("Verifying given extra values file")
+        log.info("Verifying given extra values file")
         # Verify values file has .csv extension
         values_name, values_extension = os.path.splitext(args.values)
         if values_extension != CSV_EXTENSION:

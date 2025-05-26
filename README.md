@@ -273,9 +273,9 @@ There could often be a requirement to add some custom data to the nvs binaries g
 
 > **Note:**  
 > - When a valid values CSV file is specified in the `ADDITIONAL_VALUES` field, the `--count` argument is ignored, and the number of Node Ids for generating certificates is determined by the number of rows (excluding the header) in the provided CSV file.  
-> - If a `node_ids.csv` file is provided via the `--input_file` argument, the row count from the `ADDITIONAL_VALUES` CSV file is ignored, and the node count is determined by the `node_ids.csv` file instead.  
+> - If a `node_ids.csv` file is provided via the `--inputfile` argument, the row count from the `ADDITIONAL_VALUES` CSV file is ignored, and the node count is determined by the `node_ids.csv` file instead.  
 > - The precedence for determining the node count for device certificate generation is as follows:  
->   1. `node_ids.csv` file passed via `--input_file`  
+>   1. `node_ids.csv` file passed via `--inputfile`  
 >   2. Values CSV file specified in the `ADDITIONAL_VALUES` field  
 >   3. The `--count` argument (used only if neither of the above is provided).  
 
