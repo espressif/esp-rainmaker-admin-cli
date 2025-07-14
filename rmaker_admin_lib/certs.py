@@ -54,6 +54,7 @@ MFG_CONFIG_FILENAME = "config.csv"
 MFG_VALUES_FILENAME = "values.csv"
 MFG_BINARY_CONFIG_FILENAME = "config{}binary_config.ini".format(path_sep)
 MQTT_ENDPOINT_FILENAME = "endpoint.txt"
+MQTT_CRED_HOST_FILENAME = "mqtt_cred_host.txt"
 CERT_VALIDATION_YEARS = 100
 
 # Set input arguments required by manufacturing tool
@@ -82,7 +83,7 @@ class Mfg_Args():
         self.input = None
         self.output = None
         self.key_protect_hmac = False
-        
+
         log.debug('Arguments set to send to manufacturing tool for '
                   'creating NVS partiton binaries')
         log.debug('conf: {}, values: {}, size: {}, '
@@ -276,7 +277,7 @@ def _save_nodeid_cert_and_qrcode_to_file(node_id, dev_cert, qrcode_payload, dest
         delimiter = ","
         newline = "\n"
         double_quote = "\""
-        
+
         # Convert certificate to PEM format (string) and wrap it in quotes
         dev_cert_bytes = dev_cert.public_bytes(encoding=serialization.Encoding.PEM)
         dev_cert_str = double_quote + dev_cert_bytes.decode('utf-8').replace('"', '""') + double_quote
@@ -346,7 +347,7 @@ def _set_filename(filename_prefix=None, outdir=None, ext=None):
 def verify_fileid_count(extra_values_file, fileid, count):
     '''
     Verify count is less than or equal to
-    number of values for fileid 
+    number of values for fileid
     '''
     log.debug("Verify fileid count")
     with open(extra_values_file, 'r') as values_file:
@@ -458,17 +459,17 @@ def get_nodeid_from_file(filename):
         with open(filename, mode='r') as csvfile:
             reader = csv.DictReader(csvfile)  # Reads the file as a dictionary with headers
             log.debug("CSV headers: {}".format(reader.fieldnames))
-            
+
             # Check if the required "node_id" column is present
             if 'node_id' not in reader.fieldnames:
                 raise ValueError(f"'node_id' column not found in file: {filename}")
-            
+
             # Extract all values from the "node_id" column
             for row in reader:
                 node_id = row['node_id'].strip()  # Strip whitespace from the value
                 if node_id:  # Add non-empty node IDs to the list
                     nodeid_list.append(node_id)
-        
+
         log.debug("Node IDs extracted: {}".format(nodeid_list))
         return nodeid_list
 
@@ -729,15 +730,15 @@ def generate_devicecert(outdir, ca_cert, ca_private_key,
         raise Exception(err)
 
 def _create_values_file(dest_values_file, id, node_id,
-                        endpoint, cert, cert_key, random_str, qrcode_payload, curr_extra_values):
+                        endpoint, mqtt_cred_host, cert, cert_key, random_str, qrcode_payload, curr_extra_values):
     log.debug("Writing to values file for manufacturing tool")
     log.debug('Writing data to values file: values_file:{} id:{} '
-              'node_id:{} endpoint:{} cert:{} cert_key:{} random_str:{} qrcode_payload:{}'.format(
-                  dest_values_file, id, node_id, endpoint, cert, cert_key, random_str, qrcode_payload))
-    
+              'node_id:{} endpoint:{} mqtt_cred_host:{} cert:{} cert_key:{} random_str:{} qrcode_payload:{}'.format(
+                  dest_values_file, id, node_id, endpoint, mqtt_cred_host, cert, cert_key, random_str, qrcode_payload))
+
     # Ensure the directory exists
     os.makedirs(os.path.dirname(dest_values_file), exist_ok=True)
-    
+
     # Open the file in append mode
     with open(dest_values_file, mode='a', newline='') as csvfile:
         writer = csv.writer(csvfile, quotechar='"', quoting=csv.QUOTE_MINIMAL)
@@ -750,6 +751,7 @@ def _create_values_file(dest_values_file, id, node_id,
             id,
             node_id,
             endpoint,
+            mqtt_cred_host or "",  # Use empty string if mqtt_cred_host is None
             cert,
             cert_key,
             random_str,
@@ -853,7 +855,7 @@ def verify_mfg_files(outdir, config_filename, values_filename, file_id):
         'node',
         None)
     log.debug("Verifying mfg files")
-    
+
     # Verifying extra_config and extra_values files
     temp_files = create_temp_files(mfg_args)
 
@@ -913,7 +915,7 @@ def gen_cert_bin(outdir, file_id, prefix_num_start, prefix_num_digits):
         config['DEFAULT'],
         outdir,
         keygen,
-        file_id, 
+        file_id,
         'node',
         (int(prefix_num_start),int(prefix_num_digits)))
     log.debug("Generating binaries")
@@ -965,6 +967,7 @@ def _create_mfg_config_file(outdir):
         'rmaker_creds,namespace,',
         'node_id,data,binary',
         'mqtt_host,data,binary',
+        'mqtt_cred_host,data,binary',
         'client_cert,file,binary',
         'client_key,file,binary',
         'random,data,hex2bin'
@@ -991,7 +994,7 @@ def _create_mfg_config_file(outdir):
 def generate_qrcode(random_hex, prov_type, prov_prefix):
     '''
     Generate payload for QR code
-    
+
     :param random_hex: Random info generated (128 bytes)
     :type random_hex: str
 
@@ -1016,7 +1019,7 @@ def generate_qrcode(random_hex, prov_type, prov_prefix):
     payload['pop'] = pop
     payload['transport'] = transport
     log.debug("QR code payload generated: {}".format(payload))
-    
+
     # Create qr code
     # All parameter values like version, mode, error is set to auto
     payload_json_str = json.dumps(payload)
@@ -1031,7 +1034,7 @@ def _check_extra_values_file_exists():
     log.debug("Checking if extra values file exists...")
     extra_values_file = get_param_from_config('ADDITIONAL_VALUES')
     return extra_values_file
-        
+
 def get_param_from_config(param):
     log.debug("Getting param from config")
     param_val = True
@@ -1156,14 +1159,14 @@ def _get_curr_extra_value(extra_values_file):
     curr_extra_values = [ item.strip() for item in extra_values_line.split(',') ]
     return curr_extra_values
 
-def _mfg_files_init(common_outdir, extra_keys_list):    
+def _mfg_files_init(common_outdir, extra_keys_list):
     log.debug("In mfg files init")
     # Set Manufacturing config file
     dest_config_filename = _create_mfg_config_file(common_outdir)
     # Open values file (needed for generating binary)
     log.debug("Creating values file for manufacturing tool")
     # Set final values  keys
-    values_keys = 'id,node_id,mqtt_host,client_cert,client_key,random,qrcode'
+    values_keys = 'id,node_id,mqtt_host,mqtt_cred_host,client_cert,client_key,random,qrcode'
     if extra_keys_list:
         # Get each comma seperated value in line
         for item in extra_keys_list:
@@ -1236,14 +1239,14 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
     step_cnt = 100
     extra_keys = None
     extra_values_file_ptr = None
-    
+
     log.debug("File Id recieved as user input: {}".format(file_id))
     try:
         # Init dir generate
         node_details_outdir, common_outdir, qrcode_outdir = _init_dir(outdir)
         # Init file generate
         dest_filename = _init_file(common_outdir)
-        # Init Certs files 
+        # Init Certs files
         dest_csv_file = _certs_files_init(dest_filename)
         # Get extra values filename
         extra_values_filename = _get_extra_values_filename()
@@ -1254,7 +1257,7 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
             extra_keys = _get_extra_values_keys(header)
         # Create the headers for the Manufacturing CSV config file
         dest_config_filename, dest_values_filename = _mfg_files_init(common_outdir, extra_keys)
-        
+
         curr_extra_values = None
 
         # Print info
@@ -1262,7 +1265,7 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
         log.info("QR code payload will be saved at location: {}".format(node_details_outdir))
         log.info("QR code image(png) will be saved at location: {}".format(qrcode_outdir))
         log.info("\nGenerating device certificates")
-        
+
         # If node_id_list is already calculated in case of input file
         if node_id_list_unique:
             node_id_list = node_id_list_unique
@@ -1296,7 +1299,7 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
                         if not file_id_suffix:
                             raise Exception('<count> provided is not equal to '
                                             'number of values for fileid: {} in file: {} '.format(
-                                                file_id, extra_values_filename)) 
+                                                file_id, extra_values_filename))
 
             # Create directory for node details for specific node id
             prefix_number = f'{int(cnt):0{prefix_num_digits}}'
@@ -1325,7 +1328,7 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
             log.debug("Saving Key for Node Id: {} at location: {}".format(
                 node_id,
                 key_dest_filename))
-            
+
             log.debug("Generating device certificate for node id: {}".format(
                 node_id))
 
@@ -1333,7 +1336,7 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
             random_hex_str, random_str_file = _gen_random_info(node_id_dir)
             if not random_hex_str and not random_str_file:
                 return
-            
+
             # Print status
             _print_status(cnt, step_cnt, msg='Random str (used as PoP) generated')
 
@@ -1347,11 +1350,24 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
 
             # Create values file for input to
             # Manufacturing Tool to generate binaries
+
+            # Try to read mqtt_cred_host from file
+            mqtt_cred_host = None
+            mqtt_cred_host_file = os.path.join(common_outdir, MQTT_CRED_HOST_FILENAME)
+            if os.path.exists(mqtt_cred_host_file):
+                try:
+                    with open(mqtt_cred_host_file, 'r') as f:
+                        mqtt_cred_host = f.read().strip()
+                    log.debug("Read mqtt_cred_host from file: {}".format(mqtt_cred_host))
+                except Exception as e:
+                    log.debug("Error reading mqtt_cred_host file: {}".format(e))
+
             _create_values_file(
                 dest_values_filename,
                 cnt,
                 node_id,
                 endpoint,
+                mqtt_cred_host,
                 cert_dest_filename,
                 key_dest_filename,
                 random_hex_str,
@@ -1370,7 +1386,7 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
                       'at location: {}'.format(
                           node_id,
                           cert_dest_filename))
-            
+
             # Save certificate
             ret_status = save_cert(dev_cert, cert_dest_filename)
             if not ret_status:
@@ -1392,7 +1408,7 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
                 return False
             log.debug("Number of certificates generated and saved")
             _print_status(cnt, step_cnt, msg='Certificates generated')
-            
+
             cnt += 1
         log.info("\nTotal certificates generated: {}".format(str(cnt - 1)))
         # Cleanup
@@ -1401,7 +1417,7 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
         if extra_values_filename:
             extra_values_file_ptr.seek(0)
             extra_values_file_ptr.close()
-        
+
         log.info("Device certificates generated successfully")
         return dest_filename
 

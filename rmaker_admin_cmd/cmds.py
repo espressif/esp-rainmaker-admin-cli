@@ -27,7 +27,7 @@ from rmaker_admin_lib.exceptions import FileError
 from rmaker_admin_lib.node_mfg import Node_Mfg
 from rmaker_admin_lib import configmanager
 from rmaker_admin_lib.certs import *
-from rmaker_admin_lib.certs import MQTT_ENDPOINT_FILENAME, gen_hex_str
+from rmaker_admin_lib.certs import MQTT_ENDPOINT_FILENAME, MQTT_CRED_HOST_FILENAME, gen_hex_str
 from rmaker_admin_lib.http_ops import download_from_url, upload_cert
 from rmaker_admin_lib.logger import log
 from rmaker_admin_lib.user import User
@@ -178,11 +178,11 @@ def _set_output_dir_cacert(outdir, endpointprefix):
     """
     Set output directory for CA Certificates.
 
-    This function ensures that a 'ca_certificates' directory exists in the 
-    provided `outdir` or current directory if no `outdir` is specified. 
-    Inside the 'ca_certificates' directory, it creates a subfolder named 
+    This function ensures that a 'ca_certificates' directory exists in the
+    provided `outdir` or current directory if no `outdir` is specified.
+    Inside the 'ca_certificates' directory, it creates a subfolder named
     after the `endpointprefix`.
-    
+
     :param outdir: The base directory where 'ca_certificates' should be created.
     :param endpointprefix: The unique prefix for the subdirectory inside 'ca_certificates'.
     :return: The path to the endpoint-specific directory inside 'ca_certificates'.
@@ -190,14 +190,14 @@ def _set_output_dir_cacert(outdir, endpointprefix):
     # Use current directory if outdir is not provided
     if not outdir:
         outdir = os.getcwd()
-    
+
     # Remove any trailing slashes or path separators
     outdir = os.path.expanduser(outdir.rstrip(os.sep))
     log.debug("Initial outdir: {}".format(outdir))
 
     # Define 'ca_certificates' directory
     ca_certificates_dir = os.path.join(outdir, 'ca_certificates')
-    
+
     # Create 'ca_certificates' directory if it doesn't exist
     if not os.path.exists(ca_certificates_dir):
         os.makedirs(ca_certificates_dir)
@@ -207,14 +207,14 @@ def _set_output_dir_cacert(outdir, endpointprefix):
 
     # Create the endpoint-specific folder inside 'ca_certificates'
     endpoint_dir = os.path.join(ca_certificates_dir, endpointprefix)
-    
+
     # Create the endpoint-specific directory if it doesn't exist
     if not os.path.exists(endpoint_dir):
         os.makedirs(endpoint_dir)
         log.debug("Directory created: {}".format(endpoint_dir))
     else:
         log.debug("Directory for endpoint '{}' already exists".format(endpointprefix))
-    
+
     # Return the path to the endpoint-specific directory
     return endpoint_dir
 
@@ -252,17 +252,24 @@ def generate_ca_cert(vars=None, outdir=None, common_outdir=None, cli_call=True, 
             node_mfg = Node_Mfg(None)
             is_local = True
             mqtt_endpoint = node_mfg.get_mqtthostname(is_local)
+        # Normalize tuple return to a string host
+        if isinstance(mqtt_endpoint, tuple):
+            mqtt_endpoint = mqtt_endpoint[0]
+        if not isinstance(mqtt_endpoint, str):
+            mqtt_endpoint = ""
 
         # Extract the mqtt_endpoint prefix using regex
         ca_prefix = re.match(MQTT_PREFIX_SUBFOLDER_REGEX, mqtt_endpoint)
         if ca_prefix:
             endpointprefix = ca_prefix.group(1)
+        else:
+            endpointprefix = "default"
 
         log.debug("Generate CA certificate")
 
         cmd_flag_outdir = vars['outdir']
         cwd = os.getcwd()
-        # Set output directory using endpoint prefix when ca cert generate command is run without any outdir 
+        # Set output directory using endpoint prefix when ca cert generate command is run without any outdir
         if cmd_flag_outdir == cwd and not common_outdir and not outdir:
             outdir_cwd = _set_output_dir_cacert(vars['outdir'], endpointprefix)
         # Create a dir if does not exist when outdir is given in ca cert generate command to add cert & key without any sub-folders
@@ -442,17 +449,26 @@ def _get_mqtt_endpoint(is_local, is_input_file):
     else:
         node_mfg = Node_Mfg(None)
         is_local = True
-    
-    endpoint = node_mfg.get_mqtthostname(is_local)
-    return endpoint
 
-def _set_data(node_count, common_outdir, is_local, is_input_file, endpoint):
+    endpoint = node_mfg.get_mqtthostname(is_local)
+    # The get_mqtthostname API returns a tuple: (mqtt_host, mqtt_cred_host)
+    # For endpoint purposes we only need the mqtt_host string.
+    if isinstance(endpoint, tuple):
+        mqtt_host = endpoint[0]
+    else:
+        mqtt_host = endpoint
+    # Normalize falsy values to empty string to avoid type issues with len()
+    if not mqtt_host:
+        return ""
+    return mqtt_host
+
+def _set_data(node_count, common_outdir, is_local, is_input_file, mqtt_host):
 
     log.debug("Set data")
     log.debug('Generating node ids for '
                 'number of nodes: {}'.format(node_count))
     node_ids_file = ""
-    
+
     if not is_input_file:
         if is_local:
             # Generate <node_count> node ids
@@ -482,7 +498,7 @@ def _set_data(node_count, common_outdir, is_local, is_input_file, endpoint):
             # Download node ids file from url
             log.info("Downloading node ids file")
             node_id_file_data = download_from_url(node_id_file_url)
-    
+
             if not node_id_file_data:
                 log.error("Download file from url failed")
                 return None, None
@@ -494,13 +510,30 @@ def _set_data(node_count, common_outdir, is_local, is_input_file, endpoint):
             return None, None
         log.info("Node ids file saved at location: {}".format(node_ids_file))
 
-    # Save mqtt endpoint into a file
-    endpoint_file = save_to_file(endpoint, common_outdir,
-                                 dest_filename=MQTT_ENDPOINT_FILENAME)
-    if not endpoint_file:
-        return None, None
-    log.info("Endpoint saved at location: {}".format(endpoint_file))    
-    return node_ids_file, endpoint
+    # Save mqtt endpoint into a file if available
+    if mqtt_host:
+        endpoint_file = save_to_file(mqtt_host, common_outdir,
+                                    dest_filename=MQTT_ENDPOINT_FILENAME)
+        if not endpoint_file:
+            return None, None
+        log.info("MQTT endpoint saved at location: {}".format(endpoint_file))
+        # Get mqtt_cred_host directly from the API
+        if not is_input_file:
+            if is_local:
+                node_mfg = Node_Mfg(None)
+            else:
+                node_mfg = Node_Mfg(token) if 'token' in locals() else Node_Mfg(None)
+
+            mqtt_host_data = node_mfg.get_mqtthostname(is_local)
+            if mqtt_host_data and isinstance(mqtt_host_data, tuple) and len(mqtt_host_data) >= 2:
+                mqtt_cred_host = mqtt_host_data[1]
+                if mqtt_cred_host:
+                    mqtt_cred_endpoint_file = save_to_file(mqtt_cred_host, common_outdir,
+                                                        dest_filename=MQTT_CRED_HOST_FILENAME)
+                    if mqtt_cred_endpoint_file:
+                        log.info("MQTT credential endpoint saved at location: {}".format(mqtt_cred_endpoint_file))
+
+    return node_ids_file, mqtt_host
 
 def gen_node_id_local(node_count):
     '''
@@ -513,7 +546,7 @@ def gen_node_id_local(node_count):
         log.debug('Generating node ids locally: {}'.format(node_count))
 
         node_list = []
-        
+
         # Using shortuuid to generate node_ids in consistent with rainmaker node_ids
         for i in range(node_count):
             node_list.append(shortuuid.uuid())
@@ -632,18 +665,18 @@ def generate_device_cert(vars=None):
         prov_prefix = "PROV"
         if vars['prov_prefix']:
             prov_prefix = vars['prov_prefix']
-        
+
         # Set output dirname
         outdir = _set_output_dir(vars['outdir'])
-        
+
         # Extra config files checks
         ret_status = _extra_config_files_checks(outdir, extra_config, extra_values, file_id)
         if not ret_status:
             return
-        
+
         if extra_values:
             node_count = count_extra_values_file_rows(extra_values)
-        
+
         # Initialize start and length for prefixing filenames
         prefix_num = vars.get('prefix_num')
         if prefix_num:
@@ -655,7 +688,7 @@ def generate_device_cert(vars=None):
 
          # find the no. of didgits in the start
         start_digits = len(str(start))
-        # raise error if length is not greater than or equal to start_digits 
+        # raise error if length is not greater than or equal to start_digits
         # and if the length is not greater than or equal to number of digits in (start + count)-1
         if int(length) < start_digits or int(length) < len(str(int(start) + int(vars['count'])-1)):
             raise Exception("Length must be greater than or equal to number of digits in start and the last node id using the count, i.e. {}".format(int(start) + int(vars['count'])-1))
@@ -663,13 +696,13 @@ def generate_device_cert(vars=None):
         # Set default file id
         if not file_id:
             file_id = 'node_id'
-        
+
         # Create output directory for all common files generated
         common_outdir = _gen_common_files_dir(outdir)
 
         # If local = true we will generate node Ids locally
         is_local = vars["local"]
-        
+
         is_node_id_file = False
         node_id_list_unique = []
         if input_node_ids_file:
@@ -680,7 +713,7 @@ def generate_device_cert(vars=None):
                 raise Exception("Invalid Input file.")
             node_id_list_unique = [*set(node_id_list)]
             is_node_id_file = True
-        
+
         # Get mqttendpoint
         endpoint = _get_mqtt_endpoint(is_local, is_node_id_file)
         if endpoint is None:
@@ -698,7 +731,7 @@ def generate_device_cert(vars=None):
             raise Exception("CA key file is not provided")
         if ca_key_filepath and not ca_cert_filepath:
             raise Exception("CA cert file is not provided")
-        
+
         _print_keyboard_interrupt_message()
         log.info('Files generated will be stored '
                 'in directory: {}'.format(outdir))
@@ -707,12 +740,12 @@ def generate_device_cert(vars=None):
         ca_prefix = re.match(MQTT_PREFIX_SUBFOLDER_REGEX, endpoint)
         if ca_prefix:
             endpointprefix = ca_prefix.group(1)
-        
+
         # Get paths for ca_certificates folder
         ca_certificates_cwd = _set_output_dir_cacert(None, endpointprefix)
         ca_cert_filepath_original = os.path.join(ca_certificates_cwd, CACERT_FILENAME)
         ca_key_filepath_original = os.path.join(ca_certificates_cwd, CA_KEY_FILENAME)
-        
+
         # Get and save CA Certificate from file
         if len(ca_cert_filepath) != 0:
             ca_cert = _get_and_save_ca_cert_from_input(common_outdir, ca_cert_filepath)
@@ -726,7 +759,7 @@ def generate_device_cert(vars=None):
                 if not ret_status:
                     return
                 log.debug("CA Cert saved in ca_certificates and common batch folder")
-        
+
         # Get and save CA Private Key from file
         if len(ca_key_filepath) != 0:
             ca_private_key = _get_and_save_ca_key_from_input(common_outdir, ca_key_filepath)
@@ -747,6 +780,20 @@ def generate_device_cert(vars=None):
             node_ids_file = input_node_ids_file
         if not node_ids_file and len(endpoint)==0:
             raise Exception("")
+
+        # Check for mqtt_cred_host if videostream option is enabled
+        if vars['videostream']:
+            log.info("Videostream option enabled, checking for mqtt_cred_host...")
+            mqtt_cred_host_file = os.path.join(common_outdir, MQTT_CRED_HOST_FILENAME)
+            if not os.path.exists(mqtt_cred_host_file):
+                raise Exception("mqtt_cred_host not available. This is required when --videostream option is enabled. Check if the deployment is done with the videostream capability.")
+            else:
+                with open(mqtt_cred_host_file, 'r') as f:
+                    mqtt_cred_host = f.read().strip()
+                if not mqtt_cred_host:
+                    raise Exception("mqtt_cred_host file exists but is empty. This is required when --videostream option is enabled. Check if the deployment is done with the videostream capability.")
+                log.info("mqtt_cred_host is available: {}".format(mqtt_cred_host))
+
         # Generate Device Cert and save into file
         certs_dest_filename = gen_and_save_certs(ca_cert,
                                                  ca_private_key,
@@ -766,7 +813,7 @@ def generate_device_cert(vars=None):
         log.info('\nYou can now run: \npython rainmaker_admin_cli.py certs '
                  'devicecert register --inputfile {} '
                  '(Register Generated Device Certificate(s))'.format(certs_dest_filename))
-    
+
     except KeyboardInterrupt:
         log.error("\nGenerate device certificate failed")
     except Exception as err:
@@ -799,7 +846,7 @@ def _remove_empty_lines(input_file):
 def _check_file_type(input_file):
     header_str = "certs"
     cert_str = "BEGIN CERTIFICATE"
-    
+
     try:
         _remove_empty_lines(input_file)
     except Exception as e:
@@ -824,9 +871,9 @@ def register_device_cert(vars=None):
                                       node ids and device certificates
                  `type` as key - Node Type
                  `model` as key - Node Model
-                 `groupname` as key - Name of the group to which 
+                 `groupname` as key - Name of the group to which
                                       nodes are to be added
-                 `parent_groupname` as key - Name of the parent group to which this newly created group will be a child group      
+                 `parent_groupname` as key - Name of the parent group to which this newly created group will be a child group
                  `subtype` as key - Node SubType
                  `tags` as key - Comma separated strings of tags to be attached to the nodes.(eg: location:Pune,office:espressif)
     :type vars: str
@@ -843,13 +890,13 @@ def register_device_cert(vars=None):
         ret_status = _cli_arg_check(vars['inputfile'], '--inputfile <csvfilename>')
         if not ret_status:
             return
-        
+
         is_valid_type = _check_file_type(vars['inputfile'])
         if not is_valid_type:
             return
 
         _print_keyboard_interrupt_message()
-        
+
         # Get current login session token
         # Re-login if session expired
         session = Session()
@@ -921,8 +968,8 @@ def register_device_cert(vars=None):
                     log.error(f"Invalid value for --node_policies: '{policy}'. Valid values are 'mqtt', 'videostream', or leave empty.")
                     return
         if force or update_nodes:
-            log.warn("\nWARNING: Ensure your backend version is 2.7.1 or higher if using the force or update_nodes flag.")         
-        #validate tags if present        
+            log.warn("\nWARNING: Ensure your backend version is 2.7.1 or higher if using the force or update_nodes flag.")
+        #validate tags if present
         tags=vars['tags']
         if tags:
             # Validations for the CSV file and tags
@@ -936,7 +983,7 @@ def register_device_cert(vars=None):
         if not cert_upload_url:
             log.error("Upload Device Certificate Failed.")
             return
-        
+
         if not request_id:
             log.warn("\nWARNING: Your cloud version appears to be below 2.8.0. Please upgrade to access the latest changes. Continuing with the older version.")
 
@@ -983,7 +1030,7 @@ def register_device_cert(vars=None):
                  '--requestid {} '
                  '(Get Device Certificate Registration '
                  'Status)'.format(job_request_id))
-    
+
     except KeyboardInterrupt:
         log.error("\nRegister device certificate failed")
     except Exception as e:
