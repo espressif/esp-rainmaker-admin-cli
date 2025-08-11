@@ -437,7 +437,7 @@ def _get_mqtt_endpoint(is_local, is_input_file):
             session = Session()
             token = session.get_access_token()
             if not token:
-                return None, None
+                return None
             node_mfg = Node_Mfg(token)
     else:
         node_mfg = Node_Mfg(None)
@@ -683,6 +683,8 @@ def generate_device_cert(vars=None):
         
         # Get mqttendpoint
         endpoint = _get_mqtt_endpoint(is_local, is_node_id_file)
+        if endpoint is None:
+            return
 
         # Generate CA Cert and CA Key
         ca_cert_filepath = vars['cacertfile']
