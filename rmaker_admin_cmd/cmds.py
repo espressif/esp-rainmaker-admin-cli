@@ -276,7 +276,7 @@ def generate_ca_cert(vars=None, outdir=None, common_outdir=None, cli_call=True, 
 
         ca_cert_filepath_original = os.path.join(outdir_cwd, CACERT_FILENAME)
         ca_key_filepath_original = os.path.join(outdir_cwd, CA_KEY_FILENAME)
-        log.info("ca_key_filepath_original is : {}".format(ca_key_filepath_original))
+        log.info("\nCA Key Filepath: {}".format(ca_key_filepath_original))
 
         # Create the common directory only if common_outdir is passed
         if common_outdir:
@@ -287,7 +287,7 @@ def generate_ca_cert(vars=None, outdir=None, common_outdir=None, cli_call=True, 
 
         # Check if the CA certificate and key already exist
         if os.path.exists(ca_cert_filepath_original) and os.path.exists(ca_key_filepath_original):
-            log.info("CA Certificate and Key already exist. Reusing the existing files.")
+            log.info("\nCA Certificate and Key already exist. Reusing the existing files.\n")
 
             # If an existing certificate and key are found, load them and return as objects
             existing_cert = load_existing_cert(ca_cert_filepath_original)  # Load as x509.Certificate object
@@ -601,10 +601,21 @@ def generate_device_cert(vars=None):
         extra_config = get_param_from_config('ADDITIONAL_CONFIG')
         extra_values = get_param_from_config('ADDITIONAL_VALUES')
 
-        if not node_count and not extra_values:
-            log.info('Atleast ADDITIONAL_VALUES file must be provided in config or count must be provided.')
+        # Warn if --count is being overridden by --inputfile or ADDITIONAL_VALUES
+        input_node_ids_file = vars.get('inputfile')
+        if input_node_ids_file:
+            if vars['count'] and int(vars['count']) > 0:
+                log.warn("\nWARNING: --count argument is ignored because --inputfile is provided. The number of node IDs will be determined by the input file.\n")  
+        elif extra_values:
+            if vars['count'] and int(vars['count']) > 0:
+                log.warn("\nWARNING: --count argument is ignored because ADDITIONAL_VALUES is specified in the config. The number of node IDs will be determined by the values CSV file.\n")
+
+        if not node_count and not extra_values and not input_node_ids_file:
+            log.error('\nAtleast one of the following must be provided: --count (argument to specify number of node ids), ADDITIONAL_VALUES (in config to specify count of node ids using rows in a CSV file), --inputfile (argument to specify node ids in a CSV file)')
             return
-        elif node_count <= 0 and not extra_values:
+        elif not node_count and extra_values and input_node_ids_file:
+            log.info('\nNOTE: Both --inputfile and ADDITIONAL_VALUES are provided. The number of node IDs will be determined by the input file.\n')
+        elif node_count <= 0 and not extra_values and not input_node_ids_file:
             ret_status = _cli_arg_check(None, '--count <count>',
                                     err_msg='<count> must be > 0')
             if not ret_status:
@@ -661,7 +672,6 @@ def generate_device_cert(vars=None):
         
         is_node_id_file = False
         node_id_list_unique = []
-        input_node_ids_file = vars["inputfile"]
         if input_node_ids_file:
             # Validate node_ids.csv file by trying to get node Ids from the file
             node_id_list = get_nodeid_from_file(input_node_ids_file)
