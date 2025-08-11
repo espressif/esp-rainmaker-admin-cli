@@ -876,6 +876,18 @@ def register_device_cert(vars=None):
         # Validate force and update_nodes
         force = vars['force']
         update_nodes = vars['update_nodes']
+        node_policies = vars['node_policies']
+        if update_nodes and node_policies:
+            log.error("--node_policies option cannot be used together with --update_nodes.")
+            return
+        valid_node_policies = ["mqtt", "videostream", ""]
+        if node_policies:
+            # Handle comma-separated values
+            policies_list = [policy.strip() for policy in node_policies.split(',')]
+            for policy in policies_list:
+                if policy not in valid_node_policies:
+                    log.error(f"Invalid value for --node_policies: '{policy}'. Valid values are 'mqtt', 'videostream', or leave empty.")
+                    return
         if force or update_nodes:
             log.warn("\nWARNING: Ensure your backend version is 2.7.1 or higher if using the force or update_nodes flag.")         
         #validate tags if present        
@@ -887,7 +899,6 @@ def register_device_cert(vars=None):
             if not tags:
                 log.error("Error ocurred while validating the tags and the csv file.")
                 return
-            
         # Get URL to upload Device Certificate to
         cert_upload_url,request_id = node_mfg.get_cert_upload_url(basefilename)
         if not cert_upload_url:
@@ -925,7 +936,7 @@ def register_device_cert(vars=None):
                     log.error("Please enter a valid input.")
 
         # Register Device Certificate
-        job_request_id = node_mfg.register_cert_req(basefilename, md5_checksum, refresh_token, node_type, node_model, group_name, parent_group_id, parent_group_name, subtype, tags, force, update_nodes, request_id)
+        job_request_id = node_mfg.register_cert_req(basefilename, md5_checksum, refresh_token, node_type, node_model, group_name, parent_group_id, parent_group_name, subtype, tags, force, update_nodes, request_id, node_policies)
         if not job_request_id:
             log.error("Request to register device certificate failed")
             return

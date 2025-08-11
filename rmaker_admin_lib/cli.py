@@ -395,7 +395,13 @@ COMMANDS = {
                 "default": False,
                 "action":"store_true",
                 "arghelp": "Whether to skip registration of the device certificates and only add the type, model, subtype and tags to the nodes(If --update_nodes is specified)\n"
-            }
+            },
+            {
+                "argname": "--node_policies",
+                "default": "",
+                "metavar": "<nodepolicies>",
+                "arghelp": "IoT access policies that need to be attached to the manufactured nodes, eg. mqtt,videostream\n"
+            },
         ]
     },
     "devicecert_status": {
