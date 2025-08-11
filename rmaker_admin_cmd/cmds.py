@@ -36,6 +36,7 @@ from rmaker_admin_lib.configmanager import SERVER_CONFIG_FILE
 from rmaker_admin_lib.csv_validator import CsvValidator
 from rmaker_admin_lib.constants import MQTT_PREFIX_SUBFOLDER_REGEX
 from rmaker_admin_lib.constants import BLUETOOTH
+from rmaker_admin_lib.deployment import check_ses_status
 try:
     from future.utils import iteritems
     from builtins import input, str
@@ -594,6 +595,7 @@ def generate_device_cert(vars=None):
     '''
     try:
         log.debug("Generate device certificates")
+
         node_count = int(vars['count'])
 
         extra_config = get_param_from_config('ADDITIONAL_CONFIG')
@@ -851,6 +853,24 @@ def register_device_cert(vars=None):
         # Get filename from input path
         basefilename = os.path.basename(vars['inputfile'])
         node_mfg = Node_Mfg(token)
+
+
+        # Check if super admin's SES is verified
+        ses_configured = check_ses_status(token)
+        if not ses_configured:
+            log.error("\nWARNING!!! Either of the following pre-requisites needs to be met before registering device certificates:")
+            log.error("1. Rainmaker deployment's SES is still in sandbox(Not in production).")
+            log.error("2. SuperAdmin's SES Email is not verified.")
+            log.error("Without either of these pre-requisites, you will not receive emails of job status like success or failure.")
+            log.error("\nIf this a concern, please abort this job, go to AWS SES Console and get the SuperAdmin's email verified, or apply for an SES production deployment.")
+            while True:
+                confirmation = input("Do you want to ignore the warning and continue anyway? (y/n): ").strip().lower()
+                if confirmation in ['y', 'yes']:
+                    break
+                elif confirmation in ['n', 'no']:
+                    log.error("Device certificate registration aborted")
+                    sys.exit(1)
+                log.error("Invalid input. Please enter 'y' or 'n'")
 
         # validate parent groupname i.e to check if it exists and also check if it's level 0 group
         parent_group_name = vars['parent_groupname']
