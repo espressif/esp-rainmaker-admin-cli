@@ -387,7 +387,7 @@ class Node_Mfg:
         except Exception as req_exc_err:
             raise Exception(req_exc_err)
 
-    def register_cert_req(self, filename, md5_checksum, refresh_token, node_type, model, group_name,parent_group_id,parent_group_name,subtype,tags,force,update_nodes,request_id,
+    def register_cert_req(self, filename, md5_checksum, refresh_token, node_type, model, group_name,parent_group_id,parent_group_name,subtype,tags,force,update_nodes,request_id,node_policies,
                           expected_resp='request_id'):
         '''
         Request to register device certificates
@@ -422,7 +422,8 @@ class Node_Mfg:
                 'tags':tags,
                 'force':force,
                 'update_nodes':update_nodes,
-                'request_id':request_id
+                'request_id':request_id,
+                'node_policies': node_policies,
             }
             log.debug('Register Certificate Request - url: {} '
                       'req_body: {}'.format(request_url, request_body))

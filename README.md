@@ -293,6 +293,7 @@ python rainmaker_admin_cli.py certs devicecert register [-h] --inputfile <csvfil
                                                         [--tags <nodetags>]
                                                         [--force]
                                                         [--update_nodes]
+                                                        [--node_policies <policies>]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -309,6 +310,9 @@ optional arguments:
   --force  Whether to ignore the error for duplicate node registration, also updates the existing certificates
   --update_nodes Whether to skip registration of the device certificates and only add the type, model, subtype and tags to the nodes.
   --update_nodes and --force If both are given, only the existing nodes will be updated with the new type, model, subtype and tags, Also the certificates will be updated.New nodes will be skipped.
+  --node_policies IoT access policies that need to be attached to the manufactured nodes, eg. videostream. 
+  --node_policies option cannot be used together with --update_nodes. If both are provided, the command will fail.
+  --node_policies valid values: 'mqtt', 'videostream', or leave empty (default: mqtt). Multiple policies can be specified as comma-separated values (e.g., 'mqtt,videostream').
 ```
 
 For the example in device certificate generation section the node_certs_file file would be `test/2020-11-29/Mfg-00001/common/node_certs.csv`.
