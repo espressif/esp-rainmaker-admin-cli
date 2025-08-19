@@ -340,6 +340,12 @@ COMMANDS = {
                 "action":"store_true",
                 "default": False,
                 "arghelp": 'Require mqtt_cred_host to be present in the response. Will throw an error if not available.',
+            },
+            {
+                "argname": "--no-pop",
+                "action":"store_true",
+                "default": False,
+                "arghelp": 'Generate QR code without pop field',
             }
         ]
     },

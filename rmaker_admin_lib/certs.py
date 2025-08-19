@@ -991,7 +991,7 @@ def _create_mfg_config_file(outdir):
     log.debug("Manufacturing config file created")
     return dest_config_filename
 
-def generate_qrcode(random_hex, prov_type, prov_prefix):
+def generate_qrcode(random_hex, prov_type, prov_prefix, no_pop=False):
     '''
     Generate payload for QR code
 
@@ -1003,12 +1003,13 @@ def generate_qrcode(random_hex, prov_type, prov_prefix):
 
     :param prov_prefix: Provisioning prefix
     :type prov_prefix: str
+
+    :param no_pop: Generate QR code without pop field
+    :type no_pop: bool
     '''
     payload = {}
     # Set version as v1 (default)
     version = 'v1'
-    # Set pop as first 4 bytes (8 hex chars) of random info
-    pop = random_hex[0:8]
     # Set provisioning name (last 3 bytes - 6 hex chars of random info)
     prov_name = prov_prefix+'_' + random_hex[-6:]
     # Set transport
@@ -1016,7 +1017,10 @@ def generate_qrcode(random_hex, prov_type, prov_prefix):
     # Generate payload
     payload['ver'] = version
     payload['name'] = prov_name
-    payload['pop'] = pop
+    if not no_pop:
+        # Set pop as first 4 bytes (8 hex chars) of random info
+        pop = random_hex[0:8]
+        payload['pop'] = pop
     payload['transport'] = transport
     log.debug("QR code payload generated: {}".format(payload))
 
@@ -1094,7 +1098,7 @@ def _print_status(cnt, step_cnt, msg=None):
             curr_time).strftime('%H:%M:%S')
         log.info('\n[{:<6}][Current Status] {}: {}'.format(msg, timestamp, str(cnt)))
 
-def _gen_prov_data(node_id_dir, node_id_dir_str, qrcode_outdir, random_hex_str, prov_type, prov_prefix):
+def _gen_prov_data(node_id_dir, node_id_dir_str, qrcode_outdir, random_hex_str, prov_type, prov_prefix, no_pop=False):
     '''
     Generate Provisioning data
     QR code image and string
@@ -1105,7 +1109,7 @@ def _gen_prov_data(node_id_dir, node_id_dir_str, qrcode_outdir, random_hex_str, 
     # QR code image filename str is same as the current node id dirname str
     qrcode_img_str = node_id_dir_str
     # Generate payload (qr code payload) and png (qr code image)
-    qrcode_payload, qrcode = generate_qrcode(random_hex_str, prov_type, prov_prefix)
+    qrcode_payload, qrcode = generate_qrcode(random_hex_str, prov_type, prov_prefix, no_pop)
     log.debug("QR code and payload generated")
     # Save qrcode payload
     payload_file = save_to_file(qrcode_payload, node_id_dir, filename_prefix=qrcode_payload_str, ext=".txt")
@@ -1206,7 +1210,7 @@ def _certs_files_init(dest_filename):
     return dest_csv_file
 
 def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
-                       file_id, outdir, endpoint, prov_type, prov_prefix, node_id_list_unique, prefix_num_start, prefix_num_digits):
+                       file_id, outdir, endpoint, prov_type, prov_prefix, node_id_list_unique, prefix_num_start, prefix_num_digits, no_pop=False):
     '''
     Generate and save device certificate
 
@@ -1342,7 +1346,7 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
 
             # Generate provisioning data
             # QR code image and str
-            prov_status, qrcode_payload = _gen_prov_data(node_id_dir, node_id_dir_str, qrcode_outdir, random_hex_str, prov_type, prov_prefix)
+            prov_status, qrcode_payload = _gen_prov_data(node_id_dir, node_id_dir_str, qrcode_outdir, random_hex_str, prov_type, prov_prefix, no_pop)
             if not prov_status:
                 return
             # Print QR code status

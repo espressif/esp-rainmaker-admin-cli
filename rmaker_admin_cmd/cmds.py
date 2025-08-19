@@ -638,7 +638,7 @@ def generate_device_cert(vars=None):
         input_node_ids_file = vars.get('inputfile')
         if input_node_ids_file:
             if vars['count'] and int(vars['count']) > 0:
-                log.warn("\nWARNING: --count argument is ignored because --inputfile is provided. The number of node IDs will be determined by the input file.\n")  
+                log.warn("\nWARNING: --count argument is ignored because --inputfile is provided. The number of node IDs will be determined by the input file.\n")
         elif extra_values:
             if vars['count'] and int(vars['count']) > 0:
                 log.warn("\nWARNING: --count argument is ignored because ADDITIONAL_VALUES is specified in the config. The number of node IDs will be determined by the values CSV file.\n")
@@ -794,6 +794,9 @@ def generate_device_cert(vars=None):
                     raise Exception("mqtt_cred_host file exists but is empty. This is required when --videostream option is enabled. Check if the deployment is done with the videostream capability.")
                 log.info("mqtt_cred_host is available: {}".format(mqtt_cred_host))
 
+        # Get no_pop option
+        no_pop = vars.get('no_pop', False)
+
         # Generate Device Cert and save into file
         certs_dest_filename = gen_and_save_certs(ca_cert,
                                                  ca_private_key,
@@ -801,7 +804,7 @@ def generate_device_cert(vars=None):
                                                  file_id,
                                                  outdir,
                                                  endpoint,
-                                                 prov_type, prov_prefix, node_id_list_unique, start, length)
+                                                 prov_type, prov_prefix, node_id_list_unique, start, length, no_pop)
         if not certs_dest_filename:
             log.error("Generate device certificate failed")
             return

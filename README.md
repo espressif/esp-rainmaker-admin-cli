@@ -78,7 +78,7 @@ To know more about the commands in detail, please refer the Usage section below.
 2. Login:
 `python rainmaker_admin_cli.py account login --email <email_id>`
 3. Generate Device Certificate(s):
-`python rainmaker_admin_cli.py certs devicecert generate [--videostream] --count <count>`
+`python rainmaker_admin_cli.py certs devicecert generate [--videostream] [--no-pop] --count <count>`
 4. Register Generated Device Certificate(s):
 `python rainmaker_admin_cli.py certs devicecert register --inputfile <inputfile>`
 5. Check Device Certificate Registration Status:
@@ -155,7 +155,7 @@ python rainmaker_admin_cli.py certs devicecert generate [-h] [--outdir <outdir>]
                                                         [--cacertfile <cacertfile>] [--cakeyfile <cakeyfile>]
                                                         [--prov <prov_type>] [--prov_prefix <prov_prefix>] [--fileid <fileid>]
                                                         [--local] [--inputfile <inputfile>] [--prefix_num <start> <length>]
-                                                        [--videostream]
+                                                        [--videostream] [--no-pop]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -184,6 +184,7 @@ optional arguments:
   --prefix_num <start> <length>
                         These prefix numbers start (counter) and length (minimum length of digits as prefix) are added for each node specific output filenames as index. For example --prefix 1 4 will set file or folder name prefixes as node-0001-<node_id>.<file_extension if it is a file>. The prefixes follow order of 0001, 0002, 0003, etc as per the start (counter) value and the number of nodes for which to generate the device certificates (--count). The default value of the index is 1 (start) and 6 (length).
   --videostream         Require mqtt_cred_host to be present in the response. Will throw an error if not available.
+  --no-pop              Generate QR code without pop field. When specified, the QR code payload will not include the 'pop' field.
 ```
 
 For generating the node Ids locally without the rainmaker login:
@@ -194,6 +195,10 @@ For generating the node certificates by providing pre-generated node ids csv fil
 > Note: In this command, the count and local arguments will be ignored, and the inputfile will take precedence, determining the number of Node IDs for which device certificates will be generated.
 > - The input file must be a CSV with a header row (field names as the first row).
 > - Node IDs will only be retrieved from rows under a single column named **`node_id`**.
+
+For generating device certificates with QR codes without the pop field:
+`python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test --local --no-pop`
+> Note: When using `--no-pop`, the generated QR codes will not include the pop field, which might be required for certain firmware implementations that don't use pop-based authentication.
 
 For simplest use case, the usage is as given below. If you want to add some custom data or customise some other parameters, please refer the subsequent sections.
 
