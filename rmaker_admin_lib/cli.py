@@ -314,7 +314,7 @@ COMMANDS = {
                 "argname": "--local",
                 "action":"store_true",
                 "default": False,
-                "arghelp": 'This is to determine whether to generate node ids locally\n'       
+                "arghelp": 'This is to determine whether to generate node ids locally\n'
             },
             {
                 "argname": "--inputfile",
@@ -334,6 +334,12 @@ COMMANDS = {
                 "metavar": "<prov_prefix>",
                 "default": "PROV",
                 "arghelp": 'Optional prefix in provisioning name (requires changes in firmware)',
+            },
+            {
+                "argname": "--videostream",
+                "action":"store_true",
+                "default": False,
+                "arghelp": 'Require mqtt_cred_host to be present in the response. Will throw an error if not available.',
             }
         ]
     },

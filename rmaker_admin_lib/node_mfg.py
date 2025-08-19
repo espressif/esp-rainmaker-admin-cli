@@ -326,7 +326,7 @@ class Node_Mfg:
         :param parent_group_id: parent_group_id
         :type parent_group_id: str
         return values:
-        is_present: str 
+        is_present: str
         group_id: str
         '''
         try:
@@ -536,7 +536,9 @@ class Node_Mfg:
 
     def get_mqtthostname(self,is_local):
         '''
-        Get MQTT Hostname
+        Get MQTT Hostname and MQTT Credential Hostname
+
+        :returns: Tuple containing (mqtt_host, mqtt_cred_host) where mqtt_cred_host may be None if not provided
         '''
         try:
             backslash = '/'
@@ -554,31 +556,45 @@ class Node_Mfg:
             log.debug("Get MQTT hostname - url: {}".format(request_url))
 
             while retry_cnt > 0:
-                log.debug('Sending HTTP {} request - url: {} '
-                          'headers: {}'.format(
-                              'get',
-                              request_url,
-                              self.request_header))
-                response = requests.get(url=request_url,
-                                        headers=self.request_header,
-                                        verify=configmanager.CERT_FILE,
-                                        timeout=(30.0, 30.0))
-                log.debug("Response status code received: {}".format(
-                    response.status_code))
-                response = json.loads(response.text)
-                log.debug("Response received: {}".format(response))
+                try:
+                    log.debug('Sending HTTP {} request - url: {} '
+                              'headers: {}'.format(
+                                  'get',
+                                  request_url,
+                                  self.request_header))
+                    response = requests.get(url=request_url,
+                                            headers=self.request_header,
+                                            verify=configmanager.CERT_FILE,
+                                            timeout=(30.0, 30.0))
+                    log.debug("Response status code received: {}".format(
+                        response.status_code))
+                    response = json.loads(response.text)
+                    log.debug("Response received: {}".format(response))
 
-                if 'mqtt_host' in response:
-                    log.debug("Response mqtt hostname: {}".format(
-                        response['mqtt_host']))
-                    return response['mqtt_host']
+                    if 'mqtt_host' in response:
+                        mqtt_host = response['mqtt_host']
+                        mqtt_cred_host = None
+
+                        if 'mqtt_cred_host' in response:
+                            mqtt_cred_host = response['mqtt_cred_host']
+                            log.debug("Response mqtt credential hostname: {}".format(mqtt_cred_host))
+
+                        log.debug("Response mqtt hostname: {}".format(mqtt_host))
+                        return (mqtt_host, mqtt_cred_host)
+
+                except NetworkError as net_err:
+                    log.error(net_err)
+                except RequestTimeoutError as req_err:
+                    log.error(req_err)
+                except RequestException as err:
+                    log.error(err)
 
                 log.info("Retrying...No of retries left: {}".format(
                     str(retry_cnt - 1)))
                 retry_cnt -= 1
                 time.sleep(5)
 
-            return False
+            return (False, None)
 
         except SSLError as ssl_err:
             log.error(ssl_err)

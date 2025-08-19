@@ -41,13 +41,13 @@ git clone https://github.com/espressif/esp-rainmaker-admin-cli.git
   - Linux / MacOS / Windows (standard distributions)
 
 ### Other requirements
-To setup your build environment, please make sure you have the following installed on your host machine: 
+To setup your build environment, please make sure you have the following installed on your host machine:
 
   - `python` (If not installed, please refer to https://www.python.org/)
   - `pip` (If not present, please refer to https://pip.pypa.io/en/stable/)
   - `virtualenv` (You can install using command - `pip install virtualenv`). This is not mandatory, but recommended so that rest of your python based utilities do not break.
 
-The following python versions are supported: 
+The following python versions are supported:
 
 - python 3.5.x
 - python 3.6.x
@@ -71,17 +71,17 @@ python -m pip install -r requirements.txt
 ## Workflow
 
 You need to perform the following steps to generate and register node credentials.
-To know more about the commands in detail, please refer the Usage section below.  
+To know more about the commands in detail, please refer the Usage section below.
 
-1. Set Server Configuration:  
+1. Set Server Configuration:
 `python rainmaker_admin_cli.py account serverconfig --endpoint <endpoint>`
-2. Login:  
+2. Login:
 `python rainmaker_admin_cli.py account login --email <email_id>`
 3. Generate Device Certificate(s):
-`python rainmaker_admin_cli.py certs devicecert generate --count <count>`
-4. Register Generated Device Certificate(s):  
+`python rainmaker_admin_cli.py certs devicecert generate [--videostream] --count <count>`
+4. Register Generated Device Certificate(s):
 `python rainmaker_admin_cli.py certs devicecert register --inputfile <inputfile>`
-5. Check Device Certificate Registration Status:   
+5. Check Device Certificate Registration Status:
 `python rainmaker_admin_cli.py certs devicecert getcertstatus --requestid <request_id>`
 
 ## Usage
@@ -121,7 +121,7 @@ You need to login to get started and use the subsequent APIs. The email id for l
 
 
 Usage:
-  
+
 `python rainmaker_admin_cli.py account login --email <emailid>`
 
 > **Note**: Login configuration will be stored at location `~/.espressif/rainmaker/rainmaker_admin_config.json`
@@ -134,8 +134,8 @@ Usage:
 
 You can perform the following operations for the device certificate.
 
-- `generate` - You can generate multiple device certificates at a time.  
-- `register` - You can register multiple generated device certificates.  
+- `generate` - You can generate multiple device certificates at a time.
+- `register` - You can register multiple generated device certificates.
 - `getcertstatus` - Once you register the device certificates, you can check the device certificate registration status.
 
 #### Generate Device Certificates
@@ -155,6 +155,7 @@ python rainmaker_admin_cli.py certs devicecert generate [-h] [--outdir <outdir>]
                                                         [--cacertfile <cacertfile>] [--cakeyfile <cakeyfile>]
                                                         [--prov <prov_type>] [--prov_prefix <prov_prefix>] [--fileid <fileid>]
                                                         [--local] [--inputfile <inputfile>] [--prefix_num <start> <length>]
+                                                        [--videostream]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -167,11 +168,11 @@ optional arguments:
                         Path to file containing CA Certificate
   --cakeyfile <cakeyfile>
                         Path to file containing CA Private Key
-  --prov <prov_type>    Provisioning type to generate QR code 
+  --prov <prov_type>    Provisioning type to generate QR code
                         (softap/ble) Default value: ble
-  --prov_prefix <prov_prefix>    
+  --prov_prefix <prov_prefix>
                         Provisioning name (requires changes in firmware) Default is PROV
-  --fileid <fileid>     File identifier 
+  --fileid <fileid>     File identifier
                         Used to identify file for each node uniquely (used as filename suffix)
                         Default: <node_id> (The node id's generated)
                         If provided, eg. `mac_addr`(MAC address),
@@ -180,8 +181,9 @@ optional arguments:
   --local       This is to determine whether or not to generate node ids locally.
                         Default: false if not specified.
   --inputfile <csvfile> This is the node_ids.csv file containing pre-generated node ids.
-  --prefix_num <start> <length> 
+  --prefix_num <start> <length>
                         These prefix numbers start (counter) and length (minimum length of digits as prefix) are added for each node specific output filenames as index. For example --prefix 1 4 will set file or folder name prefixes as node-0001-<node_id>.<file_extension if it is a file>. The prefixes follow order of 0001, 0002, 0003, etc as per the start (counter) value and the number of nodes for which to generate the device certificates (--count). The default value of the index is 1 (start) and 6 (length).
+  --videostream         Require mqtt_cred_host to be present in the response. Will throw an error if not available.
 ```
 
 For generating the node Ids locally without the rainmaker login:
@@ -190,7 +192,7 @@ For generating the node Ids locally without the rainmaker login:
 For generating the node certificates by providing pre-generated node ids csv file:
 `python rainmaker_admin_cli.py certs devicecert generate --prov ble --outdir test --inputfile <node_ids.csv>`
 > Note: In this command, the count and local arguments will be ignored, and the inputfile will take precedence, determining the number of Node IDs for which device certificates will be generated.
-> - The input file must be a CSV with a header row (field names as the first row). 
+> - The input file must be a CSV with a header row (field names as the first row).
 > - Node IDs will only be retrieved from rows under a single column named **`node_id`**.
 
 For simplest use case, the usage is as given below. If you want to add some custom data or customise some other parameters, please refer the subsequent sections.
@@ -214,6 +216,7 @@ Sample result for 2 nodes is as below :
               │   ├── config_tmp.csv
               │   ├── config.csv
               │   ├── endpoint.txt
+              │   ├── mqtt_cred_host.txt  # if --videostream option was given
               │   ├── node_certs.csv
               │   ├── node_ids.csv
               │   ├── values_tmp.csv
@@ -249,6 +252,7 @@ The output directory contains the following files:
 	- `ca.crt`: CA Certificate.
 	- `ca.key`: CA Key.
 	- `endpoint.txt`: MQTT Endpoint for this deployment.
+  - `mqtt_cred_host.txt`: Endpoint to obtain credentials for webrtc video streaming
 	- `node_certs.csv` : CSV for all the Node Certificates in this batch to be registered to the cloud.
 	- `node_ids.csv` : CSV for all node ids generated in this batch.
 	- `config.csv` : The NVS configuration file as per the format defined [here](https://github.com/espressif/esp-idf/tree/master/tools/mass_mfg#csv-configuration-file) for the IDF Manufacturing Utility.
@@ -258,7 +262,7 @@ The output directory contains the following files:
   - `node-<index>-<node_id>.bin`: For each device certificate, the corresponding csv file used as configuration to generate the binary.
 - `keys/`:
   - `keys-node-<index>-<node_id>.bin`: For each device certificate, the corresponding encryption key (if encryption is enabled in [config](config/binary_config.ini)).the binary.
-- `node_details/`: All node details are stored in this directory.   
+- `node_details/`: All node details are stored in this directory.
    Following details for each node are stored in `node_details/node-<index>-<node_id>` directory:
 	- `node.crt`: Device Certificates.
 	- `node.key`: Private key for each device certificate.
@@ -271,15 +275,16 @@ The output directory contains the following files:
 
 There could often be a requirement to add some custom data to the nvs binaries generated. Such custom data can be added using the formats specified by the ESP IDF [Manufacturing Utility](https://github.com/espressif/esp-idf/tree/master/tools/mass_mfg). The [config file](https://github.com/espressif/esp-idf/tree/master/tools/mass_mfg#csv-configuration-file) and [values file](https://github.com/espressif/esp-idf/tree/master/tools/mass_mfg#master-value-csv-file) can be given as input by setting the `ADDITIONAL_CONFIG` and `ADDITIONAL_VALUES` fields in [config/binary_config.ini](config/binary_config.ini). Please check out samples for such files at [samples/extra_config.csv](samples/extra_config.csv) and [samples/extra_values.csv](samples/extra_values.csv)
 
-> **Note:**  
-> - When a valid values CSV file is specified in the `ADDITIONAL_VALUES` field, the `--count` argument is ignored, and the number of Node Ids for generating certificates is determined by the number of rows (excluding the header) in the provided CSV file.  
-> - If a `node_ids.csv` file is provided via the `--inputfile` argument, the row count from the `ADDITIONAL_VALUES` CSV file is ignored, and the node count is determined by the `node_ids.csv` file instead.  
-> - The precedence for determining the node count for device certificate generation is as follows:  
->   1. `node_ids.csv` file passed via `--inputfile`  
->   2. Values CSV file specified in the `ADDITIONAL_VALUES` field  
->   3. The `--count` argument (used only if neither of the above is provided).  
+> **Note:**
+> - When a valid values CSV file is specified in the `ADDITIONAL_VALUES` field, the `--count` argument is ignored, and the number of Node Ids for generating certificates is determined by the number of rows (excluding the header) in the provided CSV file.
+> - If a `node_ids.csv` file is provided via the `--inputfile` argument, the row count from the `ADDITIONAL_VALUES` CSV file is ignored, and the node count is determined by the `node_ids.csv` file instead.
+> - The precedence for determining the node count for device certificate generation is as follows:
+>   1. `node_ids.csv` file passed via `--inputfile`
+>   2. Values CSV file specified in the `ADDITIONAL_VALUES` field
+>   3. The `--count` argument (used only if neither of the above is provided).
+> - When videostream feature is needed, `--videostream` switch should be passed to instruct the tool to include `mqtt_cred_host` in the factory partition.
 
-       
+
 #### Register Device Certificates
 
 Once the device certificates are generated, they also need to be registered with the cloud service using the register command.
@@ -303,14 +308,14 @@ optional arguments:
                         Name of the group to which node are to be added after successful registration
   --type <nodetype>     Node type
   --model <nodemodel>   Node model
-  --parent_groupname <parent_groupname> 
-                        Name of the parent group to which this newly created group will be a child group      
+  --parent_groupname <parent_groupname>
+                        Name of the parent group to which this newly created group will be a child group
   --subtype <nodesubtype> Node SubType
   --tags <nodetags> Comma separated strings of tags to be attached to the nodes.(eg: location:Pune,office:espressif)
   --force  Whether to ignore the error for duplicate node registration, also updates the existing certificates
   --update_nodes Whether to skip registration of the device certificates and only add the type, model, subtype and tags to the nodes.
   --update_nodes and --force If both are given, only the existing nodes will be updated with the new type, model, subtype and tags, Also the certificates will be updated.New nodes will be skipped.
-  --node_policies IoT access policies that need to be attached to the manufactured nodes, eg. videostream. 
+  --node_policies IoT access policies that need to be attached to the manufactured nodes, eg. videostream.
   --node_policies option cannot be used together with --update_nodes. If both are provided, the command will fail.
   --node_policies valid values: 'mqtt', 'videostream', or leave empty (default: mqtt). Multiple policies can be specified as comma-separated values (e.g., 'mqtt,videostream').
 ```
@@ -320,12 +325,12 @@ This command will give a request id in response, which can be used for monitorin
 
 ##### Adding Tags
 
-Basic Tags can be added to nodes using the `--tags` option. Using `--tags loc:Amsterdam` will add this same tag to all the nodes in `node_certs.csv`.  
-> Note that for adding tags, minimum rainmaker supported version is 1.1.27.  
+Basic Tags can be added to nodes using the `--tags` option. Using `--tags loc:Amsterdam` will add this same tag to all the nodes in `node_certs.csv`.
+> Note that for adding tags, minimum rainmaker supported version is 1.1.27.
 
 If different tag values are to be used for each node in the `node_certs.csv` file, use `--tags loc:@city`, where `city` should be a column in the `node_certs.csv`.
 
-For example:  
+For example:
 node_certs.csv:
 | node_id | certs | city      |
 | ------- | ----- | --------- |
@@ -364,7 +369,7 @@ python rainmaker_admin_cli.py certs cacert generate
 
 This will generate the CA key and certificate at following locations:
 
-- `ca_certificates/<mqttendpoint>/ca.key` 
+- `ca_certificates/<mqttendpoint>/ca.key`
 - `ca_certificates/<mqttendpoint>/ca.crt`
 
 ```
@@ -372,7 +377,7 @@ python rainmaker_admin_cli.py certs cacert generate --outdir <outdir>
 ```
 This will generate the CA key and certificate at following locations:
 
-- `<outdir>/ca.key` 
+- `<outdir>/ca.key`
 - `<outdir>/ca.crt`
 
 If there already exists CA a certificate and a key, then the existing ones are reused.
