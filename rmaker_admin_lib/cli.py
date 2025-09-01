@@ -311,10 +311,16 @@ COMMANDS = {
                            'and must have <count> values in the file (for each node)\n'
             },
             {
+                "argname": "--cloud",
+                "action":"store_true",
+                "default": False,
+                "arghelp": 'Use cloud-based node ID generation (requires login). Default is local generation\n'
+            },
+            {
                 "argname": "--local",
                 "action":"store_true",
                 "default": False,
-                "arghelp": 'This is to determine whether to generate node ids locally\n'
+                "arghelp": 'Use local node ID generation (default behavior). This flag is redundant but kept for compatibility\n'
             },
             {
                 "argname": "--inputfile",

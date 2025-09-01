@@ -617,7 +617,10 @@ def generate_device_cert(vars=None):
                        Device Certificate(s)
             KeyboardInterrupt: If there is a keyboard interrupt by user
 
-    :param vars: `local` as key - This is to determine whether or not to generate node ids locally
+    :param vars: `cloud` as key - This is to determine whether to use cloud-based node id generation (default: False, uses local)
+    :type vars: bool
+    
+    :param vars: `local` as key - Redundant flag for local generation (already default), kept for compatibility
     :type vars: bool
 
     :param vars: `inputfile` as key - This is the node_ids.csv file containing pre-generated node ids
@@ -700,8 +703,8 @@ def generate_device_cert(vars=None):
         # Create output directory for all common files generated
         common_outdir = _gen_common_files_dir(outdir)
 
-        # If local = true we will generate node Ids locally
-        is_local = vars["local"]
+        # If cloud = false (default) we will generate node Ids locally
+        is_local = not vars["cloud"]
 
         is_node_id_file = False
         node_id_list_unique = []

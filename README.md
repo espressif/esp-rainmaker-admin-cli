@@ -154,7 +154,7 @@ Usage:
 python rainmaker_admin_cli.py certs devicecert generate [-h] [--outdir <outdir>] [--count <count>]
                                                         [--cacertfile <cacertfile>] [--cakeyfile <cakeyfile>]
                                                         [--prov <prov_type>] [--prov_prefix <prov_prefix>] [--fileid <fileid>]
-                                                        [--local] [--inputfile <inputfile>] [--prefix_num <start> <length>]
+                                                        [--cloud] [--local] [--inputfile <inputfile>] [--prefix_num <start> <length>]
                                                         [--videostream] [--no-pop]
 
 optional arguments:
@@ -178,8 +178,10 @@ optional arguments:
                         If provided, eg. `mac_addr`(MAC address),
                         must be part of ADDITIONAL_VALUES file (provided in config)
                         and must have <count> values in the file (for each node)
-  --local       This is to determine whether or not to generate node ids locally.
-                        Default: false if not specified.
+  --cloud               Use cloud-based node ID generation.
+                        Default: local generation is used if not specified.
+  --local               Use local node ID generation (default behavior).
+                        This flag is redundant but kept for compatibility.
   --inputfile <csvfile> This is the node_ids.csv file containing pre-generated node ids.
   --prefix_num <start> <length>
                         These prefix numbers start (counter) and length (minimum length of digits as prefix) are added for each node specific output filenames as index. For example --prefix 1 4 will set file or folder name prefixes as node-0001-<node_id>.<file_extension if it is a file>. The prefixes follow order of 0001, 0002, 0003, etc as per the start (counter) value and the number of nodes for which to generate the device certificates (--count). The default value of the index is 1 (start) and 6 (length).
@@ -197,7 +199,7 @@ For generating the node certificates by providing pre-generated node ids csv fil
 > - Node IDs will only be retrieved from rows under a single column named **`node_id`**.
 
 For generating device certificates with QR codes without the pop field:
-`python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test --local --no-pop`
+`python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test --no-pop`
 > Note: When using `--no-pop`, the generated QR codes will not include the pop field, which might be required for certain firmware implementations that don't use pop-based authentication.
 
 For simplest use case, the usage is as given below. If you want to add some custom data or customise some other parameters, please refer the subsequent sections.
@@ -205,7 +207,7 @@ For simplest use case, the usage is as given below. If you want to add some cust
 > Note that it is better to first create a small set of certificates, say 5, so that you get an idea about how the tool works.
 
 Example:
-`python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test --local`
+`python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test`
 
 Sample result for 2 nodes is as below :
 
