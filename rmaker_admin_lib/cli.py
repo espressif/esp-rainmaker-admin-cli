@@ -224,6 +224,12 @@ COMMANDS = {
                 "metavar": "<emailid>",
                 "default": "",
                 "arghelp": "Registered email-id to login"
+            },
+            {
+                "argname": "--password",
+                "metavar": "<password>",
+                "default": "",
+                "arghelp": "Password for login (optional, will prompt if not provided)"
             }
         ]
     },

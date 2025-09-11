@@ -1125,7 +1125,10 @@ def login(vars=None):
         if not ret_status:
             return
 
-        _print_keyboard_interrupt_message()
+        # Only show interrupt message when user interaction will be required
+        password = vars.get('password') if vars.get('password') else None
+        if password is None:
+            _print_keyboard_interrupt_message()
 
         # Get current user email-id
         session = Session()
@@ -1141,8 +1144,8 @@ def login(vars=None):
 
         # User login
         user = User(vars['email'])
-        # Login API call
-        user_login_data = user.login()
+        # Login API call - use password if provided, otherwise prompt interactively
+        user_login_data = user.login(password)
         if not user_login_data:
             log.error("Login failed.")
             return
