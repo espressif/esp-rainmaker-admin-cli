@@ -1203,3 +1203,73 @@ def configure_server(vars=None):
         log.error("\nServer config not set")
     except Exception as e:
         log.error("Error: {}".format(e))
+
+def logout(vars=None):
+    '''
+    User logout
+
+    :raises Exception: If there is any exception while logging out
+            KeyboardInterrupt: If there is a keyboard interrupt by user
+
+    :return: None on Failure
+    :rtype: None
+    '''
+    try:
+        log.debug("Logout command")
+        ret_server_status = _verify_serverconfig_exists()
+        if not ret_server_status:
+            return
+
+        # Get current session
+        session = Session()
+        curr_email_id = session.get_curr_user_creds()
+
+        # Check if user is logged in
+        if not curr_email_id:
+            log.info("No active session found. User is not logged in.")
+            return
+
+        # Get tokens for logout API call
+        access_token = session.get_access_token()
+        refresh_token = session.get_refresh_token()
+        config = configmanager.Config()
+
+        # Always clean up local credentials, regardless of API call success
+        def cleanup_local_credentials():
+            try:
+                import os
+                if os.path.exists(config.config_file):
+                    os.remove(config.config_file)
+                    log.info("Local session data cleared for user: {}".format(curr_email_id))
+                    return True
+                else:
+                    log.info("No local session data found to clear")
+                    return True
+            except Exception as cleanup_err:
+                log.error("Failed to clear local session data: {}".format(cleanup_err))
+                return False
+
+        # Try to call logout API if we have valid tokens
+        if access_token and refresh_token:
+            try:
+                user = User(curr_email_id)
+                logout_success = user.logout(access_token, refresh_token)
+                if logout_success:
+                    log.info("Successfully logged out from server")
+                else:
+                    log.warn("Server logout failed, but proceeding with local cleanup")
+            except Exception as api_err:
+                log.warn("Error calling logout API: {}, but proceeding with local cleanup".format(api_err))
+        else:
+            log.info("No valid tokens found or session expired, proceeding with local cleanup")
+
+        # Clean up local credentials (this should always happen)
+        if not cleanup_local_credentials():
+            return
+
+        log.info("Logout completed successfully")
+
+    except KeyboardInterrupt:
+        log.error("\nLogout cancelled")
+    except Exception as e:
+        log.error("Error: {}".format(e))

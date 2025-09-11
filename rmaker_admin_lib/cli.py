@@ -233,6 +233,12 @@ COMMANDS = {
             }
         ]
     },
+    "logout": {
+        "cmd": "logout",
+        "help": "Logout from current session\n",
+        "func": "logout",
+        "args": []
+    },
     "certs": {
         "cmd": "certs",
         "help": "Certificate Operations"
