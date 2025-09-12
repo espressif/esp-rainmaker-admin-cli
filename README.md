@@ -122,9 +122,21 @@ You need to login to get started and use the subsequent APIs. The email id for l
 
 Usage:
 
-`python rainmaker_admin_cli.py account login --email <emailid>`
+`python rainmaker_admin_cli.py account login --email <emailid> [--password <password>]`
+
+> **Note**: If password is not passed, it will be prompted for and not shown on screen for security reasons.
 
 > **Note**: Login configuration will be stored at location `~/.espressif/rainmaker/rainmaker_admin_config.json`
+
+#### Logout
+
+To logout from the current session and clear stored credentials.
+
+Usage:
+
+`python rainmaker_admin_cli.py account logout`
+
+> **Note**: This will logout from the server and remove local session data.
 
 
 **You can now use the rest of the commands once you have logged in successfully.**

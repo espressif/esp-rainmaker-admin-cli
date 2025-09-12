@@ -205,3 +205,66 @@ class User:
             log.error(req_exc_err)
         except Exception as err:
             raise Exception(err)
+
+    def logout(self, access_token, refresh_token):
+        """
+        Logout user by calling the /logout2 API
+
+        :param access_token: Access token for authentication
+        :type access_token: str
+
+        :param refresh_token: Refresh token to send in request payload
+        :type refresh_token: str
+        """
+        try:
+            backslash = '/'
+            socket.setdefaulttimeout(10)
+            # Set HTTP Request
+            path = 'logout2'
+            logout_url = constants.HOST.rstrip(backslash) + backslash + path
+
+            # Set request headers with access token
+            request_headers = {
+                'content-type': 'application/json',
+                'Authorization': access_token
+            }
+
+            # Set request payload with refresh token
+            request_payload = {
+                'refreshtoken': refresh_token
+            }
+
+            log.debug('Sending HTTP POST Request - logout url: {} '
+                      'headers: {} payload: {}'.format(logout_url, request_headers, json.dumps(request_payload)))
+
+            # Send HTTP POST Request
+            response = requests.post(url=logout_url,
+                                     data=json.dumps(request_payload),
+                                     headers=request_headers,
+                                     verify=configmanager.CERT_FILE,
+                                     timeout=(30.0, 30.0))
+
+            response = json.loads(response.text)
+            log.debug("Response received: {}".format(response))
+
+            # Check response
+            if 'status' in response:
+                log.debug("Response status: {}".format(response['status']))
+                if 'success' in response['status']:
+                    return True
+                elif 'failure' in response['status']:
+                    log.info(response.get('description', 'Logout failed'))
+                    return False
+            return False
+
+        except SSLError as ssl_err:
+            log.error(ssl_err)
+        except NetworkError as net_err:
+            log.error(net_err)
+        except RequestTimeoutError as req_err:
+            log.error(req_err)
+        except RequestException as req_exc_err:
+            log.error(req_exc_err)
+        except Exception as err:
+            log.error(err)
+            return False

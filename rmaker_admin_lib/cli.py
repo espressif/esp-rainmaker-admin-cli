@@ -224,8 +224,20 @@ COMMANDS = {
                 "metavar": "<emailid>",
                 "default": "",
                 "arghelp": "Registered email-id to login"
+            },
+            {
+                "argname": "--password",
+                "metavar": "<password>",
+                "default": "",
+                "arghelp": "Password for login (optional, will prompt if not provided)"
             }
         ]
+    },
+    "logout": {
+        "cmd": "logout",
+        "help": "Logout from current session\n",
+        "func": "logout",
+        "args": []
     },
     "certs": {
         "cmd": "certs",

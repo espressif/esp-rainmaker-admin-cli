@@ -39,6 +39,9 @@ def main():
         # Setup CLI command for Account Login Operations
         argparse_obj.set_sub_command(acc_cmd_subparser, 'login')
 
+        # Setup CLI command for Account Logout Operations
+        argparse_obj.set_sub_command(acc_cmd_subparser, 'logout')
+
         # Setup CLI command for Certs Operations
         certs_cmd_parser, certs_cmd_subparser = argparse_obj.set_command(
             parent_subparser,
