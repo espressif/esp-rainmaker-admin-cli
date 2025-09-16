@@ -10,6 +10,7 @@
     - [Account Operations](#account-operations)
       - [Server Config](#server-config)
       - [Login](#login)
+      - [Logout](#logout)
     - [Device Certificate Operations](#device-certificate-operations)
       - [Generate Device Certificates](#generate-device-certificates)
       - [Register Device Certificates](#register-device-certificates)
@@ -194,7 +195,7 @@ optional arguments:
                         Default: false if not specified.
   --inputfile <csvfile> This is the node_ids.csv file containing pre-generated node ids.
   --prefix_num <start> <length>
-                        These prefix numbers start (counter) and length (minimum length of digits as prefix) are added for each node specific output filenames as index. For example --prefix 1 4 will set file or folder name prefixes as node-0001-<node_id>.<file_extension if it is a file>. The prefixes follow order of 0001, 0002, 0003, etc as per the start (counter) value and the number of nodes for which to generate the device certificates (--count). The default value of the index is 1 (start) and 6 (length).
+                        These prefix numbers start (counter) and length (minimum length of digits as prefix) are added for each node specific output filenames as index. For example --prefix_num 1 4 will set file or folder name prefixes as node-0001-<node_id>.<file_extension if it is a file>. The prefixes follow order of 0001, 0002, 0003, etc as per the start (counter) value and the number of nodes for which to generate the device certificates (--count). The default value of the index is 1 (start) and 6 (length).
   --videostream         Require mqtt_cred_host to be present in the response. Will throw an error if not available.
   --no-pop              Generate QR code without pop field. When specified, the QR code payload will not include the 'pop' field.
 ```
