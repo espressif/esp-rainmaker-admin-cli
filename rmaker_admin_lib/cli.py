@@ -432,6 +432,12 @@ COMMANDS = {
                 "metavar": "<nodepolicies>",
                 "arghelp": "IoT access policies that need to be attached to the manufactured nodes, eg. mqtt,videostream\n"
             },
+            {
+                "argname": "--skip_csv_validation",
+                "default": False,
+                "action":"store_true",
+                "arghelp": "Skip CSV validation (both certificate CN validation and column count validation)\n"
+            },
         ]
     },
     "devicecert_status": {

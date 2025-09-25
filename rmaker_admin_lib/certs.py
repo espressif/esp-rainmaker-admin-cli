@@ -503,6 +503,54 @@ def load_existing_key(key_path):
         key_data = key_file.read()
     return serialization.load_pem_private_key(key_data, password=None, backend=default_backend())
 
+def extract_cn_from_certificate(cert_pem_data):
+    """
+    Extract Common Name (CN) from a PEM certificate
+
+    :param cert_pem_data: Certificate data in PEM format as string
+    :return: Common Name (CN) from certificate, or None if not found
+    :rtype: str or None
+    """
+    try:
+        # Convert string to bytes if needed
+        if isinstance(cert_pem_data, str):
+            cert_pem_data = cert_pem_data.encode('utf-8')
+
+        # Load the certificate
+        cert = load_pem_x509_certificate(cert_pem_data, default_backend())
+
+        # Extract the subject and find CN
+        subject = cert.subject
+        for attribute in subject:
+            if attribute.oid == NameOID.COMMON_NAME:
+                return attribute.value
+
+        return None
+    except Exception as e:
+        log.error(f"Error extracting CN from certificate: {e}")
+        return None
+
+def validate_cert_cn_matches_node_id(node_id, cert_pem_data):
+    """
+    Validate that the Common Name (CN) in the certificate matches the node_id
+
+    :param node_id: The node ID to validate against
+    :param cert_pem_data: Certificate data in PEM format as string
+    :return: True if CN matches node_id, False otherwise
+    :rtype: bool
+    """
+    cn = extract_cn_from_certificate(cert_pem_data)
+    if cn is None:
+        log.error(f"Could not extract CN from certificate for node {node_id}")
+        return False
+
+    if cn != node_id:
+        log.error(f"Certificate CN '{cn}' does not match node_id '{node_id}'")
+        return False
+
+    log.debug(f"Certificate CN '{cn}' matches node_id '{node_id}'")
+    return True
+
 def _generate_cert(subject_name=None, issuer_name=None,
                    public_key=None, ca_key=None, ca=False):
     '''

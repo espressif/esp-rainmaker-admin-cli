@@ -319,6 +319,7 @@ python rainmaker_admin_cli.py certs devicecert register [-h] --inputfile <csvfil
                                                         [--force]
                                                         [--update_nodes]
                                                         [--node_policies <policies>]
+                                                        [--skip_csv_validation]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -338,6 +339,7 @@ optional arguments:
   --node_policies IoT access policies that need to be attached to the manufactured nodes, eg. videostream.
   --node_policies option cannot be used together with --update_nodes. If both are provided, the command will fail.
   --node_policies valid values: 'mqtt', 'videostream', or leave empty (default: mqtt). Multiple policies can be specified as comma-separated values (e.g., 'mqtt,videostream').
+  --skip_csv_validation Skip CSV validation (both certificate CN validation and column count validation). Use this option if you have want to bypass this check (NOT RECOMMENDED).
 ```
 
 For the example in device certificate generation section the node_certs_file file would be `test/2020-11-29/Mfg-00001/common/node_certs.csv`.
