@@ -1104,6 +1104,26 @@ def register_device_cert(vars=None):
         node_policies = vars['node_policies']
         skip_csv_validation = vars.get('skip_csv_validation', False)
 
+        # Get parameters for early warning check
+        node_type = vars['type']
+        node_model = vars['model']
+        subtype = vars['subtype']
+        tags = vars['tags']
+
+        # Early warning if optional parameters are missing
+        if not node_type and not node_model and not group_name and not subtype and not parent_group_name and not tags and not force and not update_nodes:
+            conti = True
+            log.warn("\nWARNING: Optional parameters are missing: type, model, group name, subtype, tags, force, update_nodes, and parent groupname.")
+            while conti:
+                goahead = input("Do you wish to continue? (y/n):")
+                if goahead == "y" or goahead == "Y":
+                    conti = False
+                elif goahead == "n" or goahead == "N":
+                    log.info("You can provide type, model, group name, subtype, force, parent groupname, update_nodes and tags using flags --type, --model, --groupname, --subtype, --force, --parent_groupname, --update_nodes, --tags.")
+                    return
+                else:
+                    log.error("Please enter a valid input.")
+
         # Original logic: skip certificate validation for update_nodes when not forced
         skip_cert_validation = update_nodes and not force
 
@@ -1129,7 +1149,6 @@ def register_device_cert(vars=None):
         if force or update_nodes:
             log.warn("\nWARNING: Ensure your backend version is 2.7.1 or higher if using the force or update_nodes flag.")
         #validate tags if present
-        tags=vars['tags']
         if tags:
             # Validations for the CSV file and tags
             csvValidator = CsvValidator(vars['inputfile'])
@@ -1156,22 +1175,6 @@ def register_device_cert(vars=None):
 
         # Get MD5 Checksum for input file
         md5_checksum = _get_md5_checksum(vars['inputfile'])
-        node_type=vars['type']
-        node_model=vars['model']
-        subtype = vars['subtype']
-
-        if not node_type and not node_model and not group_name and not subtype and not parent_group_name and not tags and not force and not update_nodes:
-            conti=True
-            log.warn("\nWARNING: type, model, group name, subtype, tags, force, update_nodes and parent groupname are absent.")
-            while conti:
-                goahead=input("Do you wish to continue? (y/n):")
-                if goahead=="y" or goahead=="Y":
-                    conti=False
-                elif goahead=="n" or goahead=="N":
-                    log.info("You can provide type, model, group name , subtype, force, parent groupname, update_nodes and tags using flags --type,--model,--groupname,--subtype, --force,--parent_groupname,--update_nodes ,--tags. ")
-                    return
-                else:
-                    log.error("Please enter a valid input.")
 
         # Register Device Certificate
         job_request_id = node_mfg.register_cert_req(basefilename, md5_checksum, refresh_token, node_type, node_model, group_name, parent_group_id, parent_group_name, subtype, tags, force, update_nodes, request_id, node_policies)
