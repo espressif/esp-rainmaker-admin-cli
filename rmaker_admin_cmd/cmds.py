@@ -353,8 +353,10 @@ def generate_ca_cert(vars=None, outdir=None, common_outdir=None, cli_call=True, 
         # Get CA Certificate info from user
         ca_cert_cfg_values = _get_cacert_user_input(ca_cert_cfg, cacert_cfg_menu)
 
+        # Get key type option
+        key_type = vars.get('key_type', 'rsa')
         # Generate CA Private Key
-        ca_private_key = generate_private_key()
+        ca_private_key = generate_private_key(key_type=key_type)
         if not ca_private_key:
             log.error("Failed to generate private key")
             return
@@ -729,6 +731,7 @@ def generate_device_cert(vars=None):
         log.debug("CA Key filename input: {}".format(ca_key_filepath))
 
         if not ca_cert_filepath and not ca_key_filepath:
+            # Auto-generate CA using same key type as device certificates
             ca_cert, ca_private_key = generate_ca_cert(vars=vars, outdir=outdir, common_outdir=common_outdir, cli_call=False, mqtt_endpoint=endpoint)
         if ca_cert_filepath and not ca_key_filepath:
             raise Exception("CA key file is not provided")
@@ -800,6 +803,9 @@ def generate_device_cert(vars=None):
         # Get no_pop option
         no_pop = vars.get('no_pop', False)
 
+        # Get key type option
+        key_type = vars.get('key_type', 'rsa')
+
         # Generate Device Cert and save into file
         certs_dest_filename = gen_and_save_certs(ca_cert,
                                                  ca_private_key,
@@ -807,7 +813,7 @@ def generate_device_cert(vars=None):
                                                  file_id,
                                                  outdir,
                                                  endpoint,
-                                                 prov_type, prov_prefix, node_id_list_unique, start, length, no_pop)
+                                                 prov_type, prov_prefix, node_id_list_unique, start, length, no_pop, key_type)
         if not certs_dest_filename:
             log.error("Generate device certificate failed")
             return
