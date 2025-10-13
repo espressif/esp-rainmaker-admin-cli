@@ -849,7 +849,7 @@ def _remove_empty_lines(input_file):
     os.rename('output_file.csv',input_file)
     return None
 
-def _check_file_type(input_file):
+def _check_file_type(input_file, skip_cert_validation=False):
     header_str = "certs"
     cert_str = "BEGIN CERTIFICATE"
 
@@ -859,7 +859,25 @@ def _check_file_type(input_file):
         log.error("\nError Validating Input file.Please check the input file.")
         return False
 
+    # Skip certificate validation if requested
+    if skip_cert_validation:
+        # For operations that don't require certificates, we only need a valid CSV file with node_ids
+        # No need to validate presence of certs column or certificate data
+        try:
+            with open(input_file, 'r', newline=None) as inputfile:
+                header_data = inputfile.readline()
+                # Just check if file has some header and at least one data row
+                if header_data.strip():
+                    data_row = inputfile.readline()
+                    if data_row.strip():
+                        return True
+            log.error("\nInput file is invalid. Please provide a valid CSV file with node IDs.")
+            return False
+        except Exception as e:
+            log.error("\nError reading input file. Please check the file format.")
+            return False
 
+    # Original validation for certificate registration
     with open(input_file, 'r', newline=None) as inputfile:
         header_data = inputfile.readline()
         if header_str in header_data:
@@ -895,10 +913,6 @@ def register_device_cert(vars=None):
         log.debug("Register device certificate")
         ret_status = _cli_arg_check(vars['inputfile'], '--inputfile <csvfilename>')
         if not ret_status:
-            return
-
-        is_valid_type = _check_file_type(vars['inputfile'])
-        if not is_valid_type:
             return
 
         _print_keyboard_interrupt_message()
@@ -962,6 +976,13 @@ def register_device_cert(vars=None):
         force = vars['force']
         update_nodes = vars['update_nodes']
         node_policies = vars['node_policies']
+
+        # Validate input file format (skip certificate validation for update_nodes when not forced)
+        skip_cert_validation = update_nodes and not force
+        is_valid_type = _check_file_type(vars['inputfile'], skip_cert_validation)
+        if not is_valid_type:
+            return
+
         if update_nodes and node_policies:
             log.error("--node_policies option cannot be used together with --update_nodes.")
             return
