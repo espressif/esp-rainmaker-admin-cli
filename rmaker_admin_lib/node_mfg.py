@@ -521,9 +521,18 @@ class Node_Mfg:
             response = json.loads(response.text)
             log.debug("Response received: {}".format(response))
 
-            log.debug("Current status: {:<3}".format(response['status']))
+            status = response.get('status', 'unknown')
+            description = response.get('description', '')
 
-            return response['status']
+            # Format status message with description if available
+            if description:
+                status_message = f"{status} ({description})"
+            else:
+                status_message = status
+
+            log.debug("Current status: {:<3}".format(status))
+
+            return status_message
 
         except SSLError as ssl_err:
             log.error(ssl_err)
