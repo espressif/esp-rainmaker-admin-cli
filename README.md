@@ -168,7 +168,7 @@ python rainmaker_admin_cli.py certs devicecert generate [-h] [--outdir <outdir>]
                                                         [--cacertfile <cacertfile>] [--cakeyfile <cakeyfile>]
                                                         [--prov <prov_type>] [--prov_prefix <prov_prefix>] [--fileid <fileid>]
                                                         [--cloud] [--local] [--inputfile <inputfile>] [--prefix_num <start> <length>]
-                                                        [--videostream] [--no-pop]
+                                                        [--videostream] [--no-pop] [--key_type <key_type>]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -200,6 +200,7 @@ optional arguments:
                         These prefix numbers start (counter) and length (minimum length of digits as prefix) are added for each node specific output filenames as index. For example --prefix_num 1 4 will set file or folder name prefixes as node-0001-<node_id>.<file_extension if it is a file>. The prefixes follow order of 0001, 0002, 0003, etc as per the start (counter) value and the number of nodes for which to generate the device certificates (--count). The default value of the index is 1 (start) and 6 (length).
   --videostream         Require mqtt_cred_host to be present in the response. Will throw an error if not available.
   --no-pop              Generate QR code without pop field. When specified, the QR code payload will not include the 'pop' field.
+  --key_type <key_type> Cryptographic key type for device certificates. Options: 'rsa' (RSA 2048-bit, default) or 'ecdsa' (ECDSA P-256, faster and smaller).
 ```
 
 For generating the node Ids locally without the rainmaker login:
@@ -214,6 +215,10 @@ For generating the node certificates by providing pre-generated node ids csv fil
 For generating device certificates with QR codes without the pop field:
 `python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test --no-pop`
 > Note: When using `--no-pop`, the generated QR codes will not include the pop field, which might be required for certain firmware implementations that don't use pop-based authentication.
+
+For generating device certificates with ECDSA keys (faster, smaller certificates):
+`python rainmaker_admin_cli.py certs devicecert generate --count 100 --key_type ecdsa --outdir test`
+> Note: ECDSA P-256 certificates are faster to generate and smaller in size compared to RSA, while providing equivalent security. RSA remains the default for compatibility.
 
 For simplest use case, the usage is as given below. If you want to add some custom data or customise some other parameters, please refer the subsequent sections.
 
@@ -319,6 +324,7 @@ python rainmaker_admin_cli.py certs devicecert register [-h] --inputfile <csvfil
                                                         [--force]
                                                         [--update_nodes]
                                                         [--node_policies <policies>]
+                                                        [--skip_csv_validation]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -338,6 +344,7 @@ optional arguments:
   --node_policies IoT access policies that need to be attached to the manufactured nodes, eg. videostream.
   --node_policies option cannot be used together with --update_nodes. If both are provided, the command will fail.
   --node_policies valid values: 'mqtt', 'videostream', or leave empty (default: mqtt). Multiple policies can be specified as comma-separated values (e.g., 'mqtt,videostream').
+  --skip_csv_validation Skip CSV validation (both certificate CN validation and column count validation). Use this option if you have want to bypass this check (NOT RECOMMENDED).
 ```
 
 For the example in device certificate generation section the node_certs_file file would be `test/2020-11-29/Mfg-00001/common/node_certs.csv`.
@@ -384,7 +391,7 @@ The steps here would generally not be required. However, if you want to explicit
 Usage:
 
 ```
-python rainmaker_admin_cli.py certs cacert generate
+python rainmaker_admin_cli.py certs cacert generate [--key_type <key_type>]
 ```
 
 This will generate the CA key and certificate at following locations:
@@ -393,7 +400,7 @@ This will generate the CA key and certificate at following locations:
 - `ca_certificates/<mqttendpoint>/ca.crt`
 
 ```
-python rainmaker_admin_cli.py certs cacert generate --outdir <outdir>
+python rainmaker_admin_cli.py certs cacert generate --outdir <outdir> [--key_type <key_type>]
 ```
 This will generate the CA key and certificate at following locations:
 
@@ -401,6 +408,8 @@ This will generate the CA key and certificate at following locations:
 - `<outdir>/ca.crt`
 
 If there already exists CA a certificate and a key, then the existing ones are reused.
+
+The `--key_type` option allows you to choose between 'rsa' (RSA 2048-bit, default) and 'ecdsa' (ECDSA P-256) for the CA certificate. Both can sign any type of device certificate.
 
 These can be used for signing the device certificates by passing these via the `--cacertfile` and `--cakeyfile` options for `rainmaker_admin_cli.py certs devicecert generate`
 

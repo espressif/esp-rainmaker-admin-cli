@@ -34,7 +34,7 @@ try:
     from future.moves.itertools import zip_longest
     from cryptography import x509
     from cryptography.x509.oid import NameOID
-    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives.asymmetric import rsa, ec
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.x509 import load_pem_x509_certificate
     from cryptography.hazmat.backends import default_backend
@@ -231,7 +231,7 @@ def save_key(key, filepath):
     Save key to file
 
     :param key: Private Key
-    :type key: RSA Private Key
+    :type key: RSA or ECDSA Private Key
 
     :param filepath: Destination filepath with filename
     :type filepath: str
@@ -503,6 +503,54 @@ def load_existing_key(key_path):
         key_data = key_file.read()
     return serialization.load_pem_private_key(key_data, password=None, backend=default_backend())
 
+def extract_cn_from_certificate(cert_pem_data):
+    """
+    Extract Common Name (CN) from a PEM certificate
+
+    :param cert_pem_data: Certificate data in PEM format as string
+    :return: Common Name (CN) from certificate, or None if not found
+    :rtype: str or None
+    """
+    try:
+        # Convert string to bytes if needed
+        if isinstance(cert_pem_data, str):
+            cert_pem_data = cert_pem_data.encode('utf-8')
+
+        # Load the certificate
+        cert = load_pem_x509_certificate(cert_pem_data, default_backend())
+
+        # Extract the subject and find CN
+        subject = cert.subject
+        for attribute in subject:
+            if attribute.oid == NameOID.COMMON_NAME:
+                return attribute.value
+
+        return None
+    except Exception as e:
+        log.error(f"Error extracting CN from certificate: {e}")
+        return None
+
+def validate_cert_cn_matches_node_id(node_id, cert_pem_data):
+    """
+    Validate that the Common Name (CN) in the certificate matches the node_id
+
+    :param node_id: The node ID to validate against
+    :param cert_pem_data: Certificate data in PEM format as string
+    :return: True if CN matches node_id, False otherwise
+    :rtype: bool
+    """
+    cn = extract_cn_from_certificate(cert_pem_data)
+    if cn is None:
+        log.error(f"Could not extract CN from certificate for node {node_id}")
+        return False
+
+    if cn != node_id:
+        log.error(f"Certificate CN '{cn}' does not match node_id '{node_id}'")
+        return False
+
+    log.debug(f"Certificate CN '{cn}' matches node_id '{node_id}'")
+    return True
+
 def _generate_cert(subject_name=None, issuer_name=None,
                    public_key=None, ca_key=None, ca=False):
     '''
@@ -515,10 +563,10 @@ def _generate_cert(subject_name=None, issuer_name=None,
     :type issuer_name: str
 
     :param public_key: Public Key
-    :type public_key: RSA Public Key
+    :type public_key: RSA or ECDSA Public Key
 
     :param ca_key: CA Key
-    :type ca_key: RSA Private Key
+    :type ca_key: RSA or ECDSA Private Key
 
     :param ca: Set if certificate is CA Certificate
     :type ca: bool
@@ -600,22 +648,36 @@ def _create_subj_name_list(cacert_info):
         log.debug("Error: {}. Cannot create subject list".format(err))
         return False
 
-def generate_private_key():
+def generate_private_key(key_type='rsa'):
     '''
     Generate Private Key
+
+    :param key_type: Type of key to generate ('rsa' or 'ecdsa')
+    :type key_type: str
     '''
     try:
-        log.debug("Generating private key")
-        # Generate Key
-        private_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=2048,
-            backend=default_backend()
-        )
-        log.debug("Generating private key: {}".format(private_key))
+        log.debug("Generating {} private key".format(key_type))
+
+        if key_type.lower() == 'ecdsa':
+            # Generate ECDSA P-256 key (much faster than RSA)
+            private_key = ec.generate_private_key(
+                ec.SECP256R1(),  # P-256 curve
+                backend=default_backend()
+            )
+            log.debug("Generated ECDSA P-256 private key")
+        else:
+            # Generate RSA key (legacy support)
+            private_key = rsa.generate_private_key(
+                public_exponent=65537,
+                key_size=2048,
+                backend=default_backend()
+            )
+            log.debug("Generated RSA 2048-bit private key")
+
+        log.debug("Private key generated successfully: {}".format(type(private_key)))
         return private_key
     except Exception as err:
-        log.debug("Error: {}. Could not generate private key".format(err))
+        log.debug("Error: {}. Could not generate {} private key".format(err, key_type))
         return False
 
 def generate_cacert(cacert_info, ca_private_key):
@@ -626,7 +688,7 @@ def generate_cacert(cacert_info, ca_private_key):
     :type cacert_info: dict
 
     :param ca_private_key: CA Private Key
-    :type ca_private_key: RSA Private Key
+    :type ca_private_key: RSA or ECDSA Private Key
     '''
     try:
         log.info("\nGenerating CA Certificate")
@@ -652,7 +714,7 @@ def generate_csr(private_key, common_name):
     Generate CSR
 
     :param private_key: Private Key
-    :type private_key: RSA Private Key
+    :type private_key: RSA or ECDSA Private Key
 
     :param common_name: Common Name
     :type common_name: str
@@ -681,7 +743,7 @@ def generate_csr(private_key, common_name):
         raise Exception(err)
 
 def generate_devicecert(outdir, ca_cert, ca_private_key,
-                        common_name=None):
+                        common_name=None, key_type='rsa'):
     '''
     Generate Device Certificate
 
@@ -692,7 +754,7 @@ def generate_devicecert(outdir, ca_cert, ca_private_key,
     :type ca_cert: x509 Certificate
 
     :param ca_private_key: CA Private Key
-    :type ca_private_key: RSA Private Key
+    :type ca_private_key: RSA or ECDSA Private Key
 
     :param common_name: Common Name
     :type common_name: str
@@ -700,11 +762,11 @@ def generate_devicecert(outdir, ca_cert, ca_private_key,
     try:
         log.debug("Generating device cert")
 
-        log.debug("Generating private key")
-        private_key = generate_private_key()
+        log.debug("Generating {} private key for device certificate".format(key_type))
+        private_key = generate_private_key(key_type=key_type)
         if not private_key:
             return False, False
-        log.debug("Private key generated")
+        log.debug("{} private key generated for device certificate".format(key_type.upper()))
 
         log.debug("Generating CSR")
         csr = generate_csr(private_key, str(common_name))
@@ -1210,7 +1272,7 @@ def _certs_files_init(dest_filename):
     return dest_csv_file
 
 def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
-                       file_id, outdir, endpoint, prov_type, prov_prefix, node_id_list_unique, prefix_num_start, prefix_num_digits, no_pop=False):
+                       file_id, outdir, endpoint, prov_type, prov_prefix, node_id_list_unique, prefix_num_start, prefix_num_digits, no_pop=False, key_type='rsa'):
     '''
     Generate and save device certificate
 
@@ -1218,7 +1280,7 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
     :type ca_cert: x509 Certificate
 
     :param ca_private_key: CA Private Key
-    :type ca_private_key: RSA Private Key
+    :type ca_private_key: RSA or ECDSA Private Key
 
     :param input_filename: Name of file containing Node Id's
     :type input_filename: str
@@ -1383,7 +1445,8 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
                 outdir,
                 ca_cert,
                 ca_private_key,
-                common_name=node_id)
+                common_name=node_id,
+                key_type=key_type)
             if not dev_cert and not priv_key:
                 return False
             log.debug('Saving Certificate for Node Id: {} '

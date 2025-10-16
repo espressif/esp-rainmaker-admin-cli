@@ -353,8 +353,10 @@ def generate_ca_cert(vars=None, outdir=None, common_outdir=None, cli_call=True, 
         # Get CA Certificate info from user
         ca_cert_cfg_values = _get_cacert_user_input(ca_cert_cfg, cacert_cfg_menu)
 
+        # Get key type option
+        key_type = vars.get('key_type', 'rsa')
         # Generate CA Private Key
-        ca_private_key = generate_private_key()
+        ca_private_key = generate_private_key(key_type=key_type)
         if not ca_private_key:
             log.error("Failed to generate private key")
             return
@@ -619,7 +621,7 @@ def generate_device_cert(vars=None):
 
     :param vars: `cloud` as key - This is to determine whether to use cloud-based node id generation (default: False, uses local)
     :type vars: bool
-    
+
     :param vars: `local` as key - Redundant flag for local generation (already default), kept for compatibility
     :type vars: bool
 
@@ -729,6 +731,7 @@ def generate_device_cert(vars=None):
         log.debug("CA Key filename input: {}".format(ca_key_filepath))
 
         if not ca_cert_filepath and not ca_key_filepath:
+            # Auto-generate CA using same key type as device certificates
             ca_cert, ca_private_key = generate_ca_cert(vars=vars, outdir=outdir, common_outdir=common_outdir, cli_call=False, mqtt_endpoint=endpoint)
         if ca_cert_filepath and not ca_key_filepath:
             raise Exception("CA key file is not provided")
@@ -800,6 +803,9 @@ def generate_device_cert(vars=None):
         # Get no_pop option
         no_pop = vars.get('no_pop', False)
 
+        # Get key type option
+        key_type = vars.get('key_type', 'rsa')
+
         # Generate Device Cert and save into file
         certs_dest_filename = gen_and_save_certs(ca_cert,
                                                  ca_private_key,
@@ -807,7 +813,7 @@ def generate_device_cert(vars=None):
                                                  file_id,
                                                  outdir,
                                                  endpoint,
-                                                 prov_type, prov_prefix, node_id_list_unique, start, length, no_pop)
+                                                 prov_type, prov_prefix, node_id_list_unique, start, length, no_pop, key_type)
         if not certs_dest_filename:
             log.error("Generate device certificate failed")
             return
@@ -849,7 +855,7 @@ def _remove_empty_lines(input_file):
     os.rename('output_file.csv',input_file)
     return None
 
-def _check_file_type(input_file, skip_cert_validation=False):
+def _check_file_type(input_file, skip_csv_validation=False, skip_cert_validation=False, validate_cert_cn=False):
     header_str = "certs"
     cert_str = "BEGIN CERTIFICATE"
 
@@ -859,10 +865,9 @@ def _check_file_type(input_file, skip_cert_validation=False):
         log.error("\nError Validating Input file.Please check the input file.")
         return False
 
-    # Skip certificate validation if requested
-    if skip_cert_validation:
-        # For operations that don't require certificates, we only need a valid CSV file with node_ids
-        # No need to validate presence of certs column or certificate data
+    # Skip all CSV validation if requested
+    if skip_csv_validation:
+        # For operations that want to skip all validation, we only check basic file readability
         try:
             with open(input_file, 'r', newline=None) as inputfile:
                 header_data = inputfile.readline()
@@ -877,15 +882,136 @@ def _check_file_type(input_file, skip_cert_validation=False):
             log.error("\nError reading input file. Please check the file format.")
             return False
 
-    # Original validation for certificate registration
-    with open(input_file, 'r', newline=None) as inputfile:
-        header_data = inputfile.readline()
-        if header_str in header_data:
-            cert_data = inputfile.readline()
-            if cert_str in cert_data:
+    # Skip certificate validation if requested (for update_nodes without force)
+    if skip_cert_validation:
+        # For operations that don't require certificates, we only need a valid CSV file with node_ids
+        # No need to validate presence of certs column or certificate data
+        import csv
+        try:
+            with open(input_file, 'r', newline=None) as csvfile:
+                reader = csv.reader(csvfile)
+                header_row = next(reader, None)
+                if not header_row:
+                    log.error("\nInput file is empty or has no header row.")
+                    return False
+
+                expected_column_count = len(header_row)
+                row_number = 1  # Header is row 1
+
+                # Check column count consistency for all data rows
+                for row in reader:
+                    row_number += 1
+                    if len(row) != expected_column_count:
+                        log.error(f"\nColumn count mismatch in row {row_number}: expected {expected_column_count} columns, found {len(row)} columns.")
+                        return False
+
+                if row_number == 1:  # Only header row found
+                    log.error("CSV file contains no data rows")
+                    return False
+
                 return True
-        log.error("\nInput file is invalid. Please provide file containing the certificates")
+        except Exception as e:
+            log.error(f"\nError validating CSV file structure: {e}")
+            return False
+
+    # Optimized single-pass validation for all requirements
+    import csv
+    from rmaker_admin_lib.certs import validate_cert_cn_matches_node_id
+
+    try:
+        with open(input_file, 'r', newline=None) as csvfile:
+            reader = csv.DictReader(csvfile)
+
+            # Validate file structure
+            if not reader.fieldnames:
+                log.error("\nInput file is empty or has no header row.")
+                return False
+
+            # Check for certificate presence in header
+            header_data = ','.join(reader.fieldnames)
+            if header_str not in header_data:
+                log.error("\nInput file is invalid. Please provide file containing the certificates")
+                return False
+
+            # Validate required columns for CN validation if requested
+            if validate_cert_cn:
+                if 'certs' not in reader.fieldnames:
+                    log.error("CSV file must contain a 'certs' column for certificate validation")
+                    return False
+
+            # Find node_id column for CN validation
+            node_id_column = None
+            if validate_cert_cn:
+                for field in ['node_id', 'CN']:
+                    if field in reader.fieldnames:
+                        node_id_column = field
+                        break
+
+                # Fallback to first column if neither 'node_id' nor 'CN' found
+                if not node_id_column:
+                    node_id_column = reader.fieldnames[0]
+                    log.warn(f"Using '{node_id_column}' as node ID column. Consider using 'node_id' or 'CN' as column header.")
+
+            expected_column_count = len(reader.fieldnames)
+            row_number = 1  # Header is row 1
+            cert_found = False
+            validation_failed = False
+
+            # Single pass validation for all requirements
+            for row in reader:
+                row_number += 1
+
+                # Check column count consistency
+                if len(row) != expected_column_count:
+                    log.error(f"\nColumn count mismatch in row {row_number}: expected {expected_column_count} columns, found {len(row)} columns.")
+                    return False
+
+                # Check for certificate in first data row if not already found
+                if not cert_found and row_number == 2:  # First data row
+                    cert_data = ','.join(row.values())
+                    if cert_str in cert_data:
+                        cert_found = True
+
+                # Perform CN validation if requested
+                if validate_cert_cn and node_id_column:
+                    node_id = row.get(node_id_column, '').strip()
+                    cert_data = row.get('certs', '').strip()
+
+                    if not node_id:
+                        log.error(f"Row {row_number}: Missing node ID")
+                        validation_failed = True
+                        continue
+
+                    if not cert_data:
+                        log.error(f"Row {row_number}: Missing certificate data for node {node_id}")
+                        validation_failed = True
+                        continue
+
+                    # Validate CN matches node_id
+                    if not validate_cert_cn_matches_node_id(node_id, cert_data):
+                        validation_failed = True
+
+            # Final validations
+            if not cert_found:
+                log.error("\nInput file is invalid. Please provide file containing the certificates")
+                return False
+
+            if row_number == 1:  # Only header row found
+                log.error("CSV file contains no data rows")
+                return False
+
+            if validate_cert_cn:
+                if validation_failed:
+                    log.error("Certificate CN validation failed. Some certificates do not have matching Common Names.")
+                    return False
+                log.info(f"Certificate CN validation passed for {row_number - 1} certificates")
+
+            return True
+
+    except Exception as e:
+        log.error(f"\nError validating CSV file: {e}")
         return False
+
 
 def register_device_cert(vars=None):
     '''
@@ -976,10 +1102,36 @@ def register_device_cert(vars=None):
         force = vars['force']
         update_nodes = vars['update_nodes']
         node_policies = vars['node_policies']
+        skip_csv_validation = vars.get('skip_csv_validation', False)
 
-        # Validate input file format (skip certificate validation for update_nodes when not forced)
+        # Get parameters for early warning check
+        node_type = vars['type']
+        node_model = vars['model']
+        subtype = vars['subtype']
+        tags = vars['tags']
+
+        # Early warning if optional parameters are missing
+        if not node_type and not node_model and not group_name and not subtype and not parent_group_name and not tags and not force and not update_nodes:
+            conti = True
+            log.warn("\nWARNING: Optional parameters are missing: type, model, group name, subtype, tags, force, update_nodes, and parent groupname.")
+            while conti:
+                goahead = input("Do you wish to continue? (y/n):")
+                if goahead == "y" or goahead == "Y":
+                    conti = False
+                elif goahead == "n" or goahead == "N":
+                    log.info("You can provide type, model, group name, subtype, force, parent groupname, update_nodes and tags using flags --type, --model, --groupname, --subtype, --force, --parent_groupname, --update_nodes, --tags.")
+                    return
+                else:
+                    log.error("Please enter a valid input.")
+
+        # Original logic: skip certificate validation for update_nodes when not forced
         skip_cert_validation = update_nodes and not force
-        is_valid_type = _check_file_type(vars['inputfile'], skip_cert_validation)
+
+        # Certificate CN validation is now default behavior (except when certificates are not required)
+        # or when --skip_csv_validation is used
+        validate_cert_cn = not skip_csv_validation and not skip_cert_validation
+
+        is_valid_type = _check_file_type(vars['inputfile'], skip_csv_validation, skip_cert_validation, validate_cert_cn)
         if not is_valid_type:
             return
 
@@ -997,7 +1149,6 @@ def register_device_cert(vars=None):
         if force or update_nodes:
             log.warn("\nWARNING: Ensure your backend version is 2.7.1 or higher if using the force or update_nodes flag.")
         #validate tags if present
-        tags=vars['tags']
         if tags:
             # Validations for the CSV file and tags
             csvValidator = CsvValidator(vars['inputfile'])
@@ -1024,22 +1175,6 @@ def register_device_cert(vars=None):
 
         # Get MD5 Checksum for input file
         md5_checksum = _get_md5_checksum(vars['inputfile'])
-        node_type=vars['type']
-        node_model=vars['model']
-        subtype = vars['subtype']
-
-        if not node_type and not node_model and not group_name and not subtype and not parent_group_name and not tags and not force and not update_nodes:
-            conti=True
-            log.warn("\nWARNING: type, model, group name, subtype, tags, force, update_nodes and parent groupname are absent.")
-            while conti:
-                goahead=input("Do you wish to continue? (y/n):")
-                if goahead=="y" or goahead=="Y":
-                    conti=False
-                elif goahead=="n" or goahead=="N":
-                    log.info("You can provide type, model, group name , subtype, force, parent groupname, update_nodes and tags using flags --type,--model,--groupname,--subtype, --force,--parent_groupname,--update_nodes ,--tags. ")
-                    return
-                else:
-                    log.error("Please enter a valid input.")
 
         # Register Device Certificate
         job_request_id = node_mfg.register_cert_req(basefilename, md5_checksum, refresh_token, node_type, node_model, group_name, parent_group_id, parent_group_name, subtype, tags, force, update_nodes, request_id, node_policies)

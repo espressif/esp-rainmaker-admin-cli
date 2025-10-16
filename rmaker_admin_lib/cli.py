@@ -263,6 +263,16 @@ COMMANDS = {
                            'Default: current directory\n'
                            'Certificate Filename: ca.crt\n'
                            'Key Filename: ca.key\n'
+            },
+            {
+                "argname": "--key_type",
+                "metavar": "<key_type>",
+                "default": "rsa",
+                "arghelp": 'Cryptographic key type for CA certificate\n'
+                           'rsa: RSA 2048-bit (recommended for CA)\n'
+                           'ecdsa: ECDSA P-256 (smaller, faster)\n'
+                           'Default: rsa',
+                "choices": ['rsa', 'ecdsa']
             }
         ]
     },
@@ -364,6 +374,16 @@ COMMANDS = {
                 "action":"store_true",
                 "default": False,
                 "arghelp": 'Generate QR code without pop field',
+            },
+            {
+                "argname": "--key_type",
+                "metavar": "<key_type>",
+                "default": "rsa",
+                "arghelp": 'Cryptographic key type for device certificates\n'
+                           'rsa: RSA 2048-bit (current default)\n'
+                           'ecdsa: ECDSA P-256 (faster, smaller keys)\n'
+                           'Default: rsa',
+                "choices": ['rsa', 'ecdsa']
             }
         ]
     },
@@ -431,6 +451,12 @@ COMMANDS = {
                 "default": "",
                 "metavar": "<nodepolicies>",
                 "arghelp": "IoT access policies that need to be attached to the manufactured nodes, eg. mqtt,videostream\n"
+            },
+            {
+                "argname": "--skip_csv_validation",
+                "default": False,
+                "action":"store_true",
+                "arghelp": "Skip CSV validation (both certificate CN validation and column count validation)\n"
             },
         ]
     },
