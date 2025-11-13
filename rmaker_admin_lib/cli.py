@@ -545,5 +545,48 @@ COMMANDS = {
                 "arghelp": "Request Id of device certificate registration"
             }
         ]
+    },
+    "download": {
+        "cmd": "download",
+        "help": "Download API response to file\n",
+        "func": "download_api",
+        "args": [
+            {
+                "argname": "--api",
+                "metavar": "<api>",
+                "default": "",
+                "arghelp": "API endpoint path (e.g., /admin/nodes)"
+            },
+            {
+                "argname": "--out",
+                "metavar": "<folder>",
+                "default": "downloads",
+                "arghelp": "Output folder name to save the API response (default: downloads)"
+            },
+            {
+                "argname": "--csv_key",
+                "metavar": "<key>",
+                "default": "",
+                "arghelp": "Optional: Key name in JSON response to extract as CSV. The value must be an array."
+            },
+            {
+                "argname": "--csv_columns",
+                "metavar": "<columns>",
+                "default": "",
+                "arghelp": "Optional: Comma-separated list of column names for CSV. Supports dot notation for nested keys (e.g., connectivity.timestamp). If provided, CSV will only contain these columns in the specified order."
+            },
+            {
+                "argname": "--query_params",
+                "metavar": "<params>",
+                "default": "",
+                "arghelp": "Optional: Query parameters for API request (e.g., node_list=true&status=online)"
+            },
+            {
+                "argname": "--pages",
+                "metavar": "<num>",
+                "default": "1",
+                "arghelp": "Optional: Number of pages to query. Default: 1. Use 0 to query all pages until end."
+            }
+        ]
     }
 }

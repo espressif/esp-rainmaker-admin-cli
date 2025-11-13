@@ -24,7 +24,6 @@ import json
 import binascii
 import datetime
 import pyqrcode
-import distutils.dir_util
 from rmaker_admin_lib.constants import CSV_EXTENSION, NAMESPACE_KEY, REPEAT_TAG
 from tools import mfg_gen
 from rmaker_admin_lib.logger import log
@@ -331,7 +330,7 @@ def _set_filename(filename_prefix=None, outdir=None, ext=None):
         # Create directory if does not exist
         if not os.path.isdir(outdir):
             log.debug("Creating dir: {}".format(outdir))
-            distutils.dir_util.mkpath(outdir)
+            os.makedirs(outdir, exist_ok=True)
             log.debug("Directory created: {}".format(outdir))
 
         filename = "".join([filename_prefix, ext])
@@ -1202,19 +1201,19 @@ def _init_dir(outdir):
     # Create output directory for all node details
     node_details_outdir = os.path.join(outdir, 'node_details')
     if not os.path.isdir(node_details_outdir):
-        distutils.dir_util.mkpath(node_details_outdir)
+        os.makedirs(node_details_outdir, exist_ok=True)
         log.debug("Directory created: {}".format(node_details_outdir))
     log.debug("Node details outdir is set to: {}".format(node_details_outdir))
     # Create output directory for all common files generated
     common_outdir = os.path.join(outdir, 'common')
     if not os.path.isdir(common_outdir):
-        distutils.dir_util.mkpath(common_outdir)
+        os.makedirs(common_outdir, exist_ok=True)
         log.debug("Directory created: {}".format(common_outdir))
     log.debug("Common outdir is set to: {}".format(common_outdir))
     # Create output directory for all qrcode image (png) files generated
     qrcode_outdir = os.path.join(outdir, 'qrcode')
     if not os.path.isdir(qrcode_outdir):
-        distutils.dir_util.mkpath(qrcode_outdir)
+        os.makedirs(qrcode_outdir, exist_ok=True)
         log.debug("Directory created: {}".format(qrcode_outdir))
     log.debug("QR code outdir is set to: {}".format(qrcode_outdir))
     return node_details_outdir, common_outdir, qrcode_outdir
@@ -1372,7 +1371,7 @@ def gen_and_save_certs(ca_cert, ca_private_key, input_filename,
             node_id_dir_str = 'node-' + str(prefix_number) + "-" + str(file_id_suffix)
             node_id_dir = os.path.join(node_details_outdir, node_id_dir_str)
             if not os.path.isdir(node_id_dir):
-                distutils.dir_util.mkpath(node_id_dir)
+                os.makedirs(node_id_dir, exist_ok=True)
                 log.debug("Directory created: {}".format(node_id_dir))
 
             # Set destination filename to save device certificates generated

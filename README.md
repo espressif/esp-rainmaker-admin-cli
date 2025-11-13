@@ -18,7 +18,8 @@
       - [Check Device Certificate Registration Status](#check-device-certificate-registration-status)
     - [CA Certificate Operations](#ca-certificate-operations)
     - [Flashing](#flashing)
-  - [Resources](#resources)
+    - [Download API Response](#download-api-response)
+    - [Resources](#resources)
 
 # ESP RainMaker Admin CLI
 
@@ -426,6 +427,120 @@ esptool.py --port <port> write_flash <fctry_address> <outdir>/bin/<filename>.bin
 > Note: The `<fctry_address>` is typically 0x340000. However, please check your partition table to find the appropriate address.
 >
 > The esptool.py would be available in your PATH only if you have esp-idf set up, else, please find it at `esp-idf/components/esptool_py/esptool/esptool.py` and use from there.
+
+
+### Download API Response
+
+The `download` command allows you to fetch API responses from the RainMaker backend and save them to files. This is particularly useful for extracting paginated data (like node lists) and converting them to CSV format for analysis or reporting.
+
+#### Purpose
+
+- Download API responses from any RainMaker API endpoint
+- Extract paginated array data and combine it into a single CSV file
+- Handle pagination automatically to fetch multiple pages
+- Export data for offline analysis or reporting
+
+#### Usage
+
+```sh
+python rainmaker_admin_cli.py download --api <api> [--out <folder>] [--csv_key <key>] [--csv_columns <columns>] [--query_params <params>] [--pages <num>]
+```
+
+#### Arguments
+
+- `--api <api>` (required): API endpoint path (e.g., `/admin/nodes`)
+- `--out <folder>` (optional): Output folder name where files will be saved. Default: `downloads`
+- `--csv_key <key>` (optional): Key name in JSON response to extract as CSV. The value must be an array (e.g., `node_info`). If not provided, only the API response will be saved (useful for understanding the API structure).
+- `--csv_columns <columns>` (optional): Comma-separated list of column names for CSV. Supports dot notation for nested keys (e.g., `connectivity.timestamp`). If provided, CSV will only contain these columns in the specified order.
+- `--query_params <params>` (optional): Query parameters for API request (e.g., `node_list=true&status=online`)
+- `--pages <num>` (optional): Number of pages to query. Default: 1. Use `0` to query all pages until end.
+
+#### Output Files
+
+When the command executes, it creates a timestamped subdirectory in the output folder to organize files from each run:
+
+```
+<output_folder>/
+  └── <timestamp>/
+      ├── api_request.txt
+      ├── api_response.txt
+      └── list.csv (only created if --csv_key is provided)
+```
+
+The timestamp format is `YYYYMMDD_HHMMSS` (e.g., `20251113_105742`), ensuring each run is isolated in its own directory.
+
+**File descriptions:**
+- `api_request.txt`: Summary of the API request including URL, query parameters, CSV settings, and pagination statistics
+- `api_response.txt`: Contains the first page API response (without the csv_key if `--csv_key` is provided)
+- `list.csv`: Contains the extracted CSV data (only created if `--csv_key` is provided)
+
+#### Pagination
+
+The download command automatically handles pagination:
+
+- **Default behavior**: Fetches only the first page (`--pages 1` or omitted)
+- **Multiple pages**: Use `--pages <num>` to fetch a specific number of pages
+- **All pages**: Use `--pages 0` to fetch all pages until the end
+- **Pagination detection**: Stops when `next_id` is absent, `null`, or `"null"` in the response
+- **Query params**: User-provided `--query_params` are included in all page requests
+- **CSV accumulation**: When using `--csv_key`, items from all fetched pages are combined into a single CSV file
+
+#### Examples
+
+**Basic download (first page only, to default folder):**
+```sh
+python rainmaker_admin_cli.py download --api "/admin/nodes"
+```
+
+**Basic download with custom output folder:**
+```sh
+python rainmaker_admin_cli.py download --api "/admin/nodes" --out "my_data"
+```
+
+**Download with CSV extraction:**
+```sh
+python rainmaker_admin_cli.py download --api "/admin/nodes" --csv_key "node_info"
+```
+
+**Download with custom CSV columns:**
+```sh
+python rainmaker_admin_cli.py download --api "/admin/nodes" --csv_key "node_info" --csv_columns "node_id,node_status,registration_timestamp"
+```
+
+**Download with nested field extraction (dot notation):**
+```sh
+python rainmaker_admin_cli.py download --api "/admin/nodes" --csv_key "node_info" --csv_columns "node_id,status.connectivity.connected,status.connectivity.timestamp"
+```
+
+**Download with query parameters:**
+```sh
+python rainmaker_admin_cli.py download --api "/admin/nodes" --csv_key "node_info" --query_params "status=online&node_list=true"
+```
+
+**Download multiple pages:**
+```sh
+python rainmaker_admin_cli.py download --api "/admin/nodes" --csv_key "node_info" --pages 5
+```
+
+**Download all pages:**
+```sh
+python rainmaker_admin_cli.py download --api "/admin/nodes" --csv_key "node_info" --pages 0
+```
+
+**Complete example with all options:**
+```sh
+python rainmaker_admin_cli.py download --api "/admin/nodes" --out "nodes_export" --csv_key "node_info" --csv_columns "node_id,node_status,registration_timestamp,status.connectivity.timestamp" --query_params "status=online" --pages 0
+```
+
+#### Notes
+
+- **Authentication**: You must be logged in to use this command (see [Login](#login))
+- **Understanding API structure**: Run the command without `--csv_key` first to see the API response structure and identify which key contains the data you want to extract
+- **CSV key exclusion**: When `--csv_key` is provided, the csv_key is excluded from `api_response.txt` to avoid storing large paginated arrays
+- **Dot notation**: Use dot notation (e.g., `status.connectivity.timestamp`) to access nested JSON fields in `--csv_columns`
+- **Array handling**: Arrays and nested objects in CSV are converted to JSON string format
+- **Column ordering**: If `--csv_columns` is provided, columns appear in the exact order specified. Otherwise, `node_id` is placed first (if present), followed by other columns alphabetically
+- **Directory organization**: Each run creates a timestamped subdirectory with all related files grouped together
 
 
 ## Resources

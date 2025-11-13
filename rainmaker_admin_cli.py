@@ -63,6 +63,9 @@ def main():
         # Setup CLI command for Profile Remove Operations
         argparse_obj.set_sub_command(profile_cmd_subparser, 'profile_remove')
 
+        # Setup CLI command for Download Operations
+        argparse_obj.set_sub_command(parent_subparser, 'download')
+
         # Setup CLI command for Certs Operations
         certs_cmd_parser, certs_cmd_subparser = argparse_obj.set_command(
             parent_subparser,
