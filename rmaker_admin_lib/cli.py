@@ -211,6 +211,12 @@ COMMANDS = {
                 "metavar": "<endpoint>",
                 "default": "",
                 "arghelp": "Server endpoint to use for CLI Operations"
+            },
+            {
+                "argname": "--profile",
+                "metavar": "<profile_name>",
+                "default": "",
+                "arghelp": "Profile name to use (defaults to 'default')"
             }
         ]
     },
@@ -238,6 +244,73 @@ COMMANDS = {
         "help": "Logout from current session\n",
         "func": "logout",
         "args": []
+    },
+    "profile": {
+        "cmd": "profile",
+        "help": "Profile Management Operations"
+    },
+    "profile_list": {
+        "cmd": "list",
+        "help": "List all available profiles\n",
+        "func": "profile_list",
+        "args": []
+    },
+    "profile_current": {
+        "cmd": "current",
+        "help": "Show current profile information\n",
+        "func": "profile_current",
+        "args": []
+    },
+    "profile_switch": {
+        "cmd": "switch",
+        "help": "Switch to a different profile\n",
+        "func": "profile_switch",
+        "args": [
+            {
+                "argname": "profile_name",
+                "metavar": "<profile_name>",
+                "default": "",
+                "arghelp": "Name of the profile to switch to"
+            }
+        ]
+    },
+    "profile_add": {
+        "cmd": "add",
+        "help": "Add a new custom profile\n",
+        "func": "profile_add",
+        "args": [
+            {
+                "argname": "profile_name",
+                "metavar": "<profile_name>",
+                "default": "",
+                "arghelp": "Name of the profile to create"
+            },
+            {
+                "argname": "--base-url",
+                "metavar": "<base_url>",
+                "default": "",
+                "arghelp": "Base URL for the profile"
+            },
+            {
+                "argname": "--description",
+                "metavar": "<description>",
+                "default": "",
+                "arghelp": "Description for the profile (optional)"
+            }
+        ]
+    },
+    "profile_remove": {
+        "cmd": "remove",
+        "help": "Remove a custom profile\n",
+        "func": "profile_remove",
+        "args": [
+            {
+                "argname": "profile_name",
+                "metavar": "<profile_name>",
+                "default": "",
+                "arghelp": "Name of the profile to remove"
+            }
+        ]
     },
     "certs": {
         "cmd": "certs",

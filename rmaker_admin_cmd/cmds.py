@@ -1331,9 +1331,10 @@ def login(vars=None):
 
 def configure_server(vars=None):
     '''
-    Set Server Config
+    Set Server Config - now profile-aware
 
     :param vars: `endpoint` as key - Endpoint of server to use
+                 `profile` as key - Optional profile name (defaults to 'default')
     :type vars: str
 
     :raises Exception: If there is any exception while configuring server
@@ -1349,7 +1350,11 @@ def configure_server(vars=None):
             return
 
         config = configmanager.Config(config="server")
-        ret_status = config.set_server_config(vars['endpoint'])
+        profile_name = vars.get('profile')  # Optional profile name
+        # Convert empty string to None
+        if profile_name == "":
+            profile_name = None
+        ret_status = config.set_server_config(vars['endpoint'], profile_name=profile_name)
         if not ret_status:
             log.error("Failed to save server config")
             return
@@ -1365,7 +1370,7 @@ def configure_server(vars=None):
 
 def logout(vars=None):
     '''
-    User logout
+    User logout - now profile-aware
 
     :raises Exception: If there is any exception while logging out
             KeyboardInterrupt: If there is a keyboard interrupt by user
@@ -1396,14 +1401,21 @@ def logout(vars=None):
         # Always clean up local credentials, regardless of API call success
         def cleanup_local_credentials():
             try:
-                import os
-                if os.path.exists(config.config_file):
-                    os.remove(config.config_file)
-                    log.info("Local session data cleared for user: {}".format(curr_email_id))
+                # Use profile-aware cleanup
+                if config.profile_manager and config.current_profile:
+                    config.profile_manager.clear_profile_tokens(config.current_profile)
+                    log.info("Local session data cleared for profile: {}".format(config.current_profile))
                     return True
                 else:
-                    log.info("No local session data found to clear")
-                    return True
+                    # Fall back to legacy cleanup
+                    import os
+                    if os.path.exists(config.config_file):
+                        os.remove(config.config_file)
+                        log.info("Local session data cleared for user: {}".format(curr_email_id))
+                        return True
+                    else:
+                        log.info("No local session data found to clear")
+                        return True
             except Exception as cleanup_err:
                 log.error("Failed to clear local session data: {}".format(cleanup_err))
                 return False
@@ -1432,3 +1444,203 @@ def logout(vars=None):
         log.error("\nLogout cancelled")
     except Exception as e:
         log.error("Error: {}".format(e))
+
+# Profile management commands
+
+def profile_list(vars=None):
+    """List all available profiles"""
+    try:
+        from rmaker_admin_lib.profile_manager import ProfileManager
+        profile_manager = ProfileManager()
+        current_profile = profile_manager.get_current_profile()
+        
+        profiles = profile_manager.list_profiles()
+        
+        if not profiles:
+            print("No profiles found. Use 'account serverconfig' to create a profile.")
+            return
+        
+        print("Available profiles:")
+        print("-" * 50)
+        
+        for profile_name, profile_config in profiles.items():
+            is_current = " (current)" if profile_name == current_profile else ""
+            print(f"  {profile_name}{is_current}")
+            print(f"    Description: {profile_config.get('description', 'N/A')}")
+            
+            if profile_config.get('base_url'):
+                print(f"    Base URL: {profile_config['base_url']}")
+            
+            # Check if user is logged in to this profile
+            if profile_manager.has_profile_tokens(profile_name):
+                print(f"    Status: Logged in")
+            else:
+                print(f"    Status: Not logged in")
+            
+            print()
+        
+    except Exception as e:
+        log.error(f"Failed to list profiles: {e}")
+
+def profile_current(vars=None):
+    """Show current profile information"""
+    try:
+        from rmaker_admin_lib.profile_manager import ProfileManager
+        profile_manager = ProfileManager()
+        current_profile = profile_manager.get_current_profile()
+        
+        if not current_profile:
+            print("No profile is currently set.")
+            print("Use 'account serverconfig' to create and set a profile.")
+            return
+        
+        profile_config = profile_manager.get_profile_config(current_profile)
+        
+        print(f"Current profile: {current_profile}")
+        print(f"Description: {profile_config.get('description', 'N/A')}")
+        
+        if profile_config.get('base_url'):
+            print(f"Base URL: {profile_config['base_url']}")
+        else:
+            print("Base URL: Not configured")
+        
+        # Check login status
+        if profile_manager.has_profile_tokens(current_profile):
+            try:
+                config = configmanager.Config()
+                session = Session()
+                email_id = session.get_curr_user_creds()
+                if email_id:
+                    print(f"Login status: Logged in as {email_id}")
+                else:
+                    print(f"Login status: Logged in")
+            except:
+                print(f"Login status: Logged in")
+        else:
+            print(f"Login status: Not logged in")
+        
+    except Exception as e:
+        log.error(f"Failed to get profile information: {e}")
+
+def profile_switch(vars=None):
+    """Switch to a different profile"""
+    profile_name = vars.get('profile_name')
+    if not profile_name:
+        log.error("Profile name is required as a positional argument")
+        return
+    
+    try:
+        from rmaker_admin_lib.profile_manager import ProfileManager
+        profile_manager = ProfileManager()
+        
+        if not profile_manager.profile_exists(profile_name):
+            print(f"Profile '{profile_name}' does not exist.")
+            print("Use 'account profile list' to see available profiles.")
+            return
+        
+        # Check if already on this profile
+        current_profile = profile_manager.get_current_profile()
+        if current_profile == profile_name:
+            print(f"Profile '{profile_name}' is already the current profile.")
+            return
+        
+        profile_manager.set_current_profile(profile_name)
+        print(f"Switched to profile '{profile_name}'")
+        
+    except Exception as e:
+        log.error(f"Failed to switch profile: {e}")
+
+def profile_add(vars=None):
+    """Add a new custom profile"""
+    profile_name = vars.get('profile_name')
+    # Handle both --base-url and --base_url for compatibility
+    base_url = vars.get('base-url') or vars.get('base_url')
+    description = vars.get('description')
+    
+    if not profile_name:
+        log.error("Profile name is required as a positional argument")
+        return
+    
+    if not base_url:
+        log.error("Base URL is required. Use --base-url <url>")
+        return
+    
+    try:
+        from rmaker_admin_lib.profile_manager import ProfileManager
+        profile_manager = ProfileManager()
+        
+        # Check if profile already exists
+        if profile_manager.profile_exists(profile_name):
+            current_profile = profile_manager.get_current_profile()
+            is_current = (current_profile == profile_name)
+            
+            print(f"\nProfile '{profile_name}' already exists.")
+            if is_current:
+                print(f"Warning: '{profile_name}' is currently the active profile.")
+            print("This will overwrite the existing profile configuration.")
+            
+            confirmation = input(f"Do you want to overwrite profile '{profile_name}'? (y/N): ").strip().lower()
+            if confirmation not in ['y', 'yes']:
+                print("Profile creation cancelled.")
+                return
+            
+            # Delete the existing profile first (this handles current profile switching)
+            # Exception: default profile can't be deleted, so we'll update it directly
+            if profile_name != ProfileManager.DEFAULT_PROFILE_NAME:
+                try:
+                    profile_manager.delete_custom_profile(profile_name)
+                except ValueError as e:
+                    raise
+        
+        # Create or update the profile (allow overwrite if profile exists)
+        allow_overwrite = profile_manager.profile_exists(profile_name)
+        profile_manager.create_custom_profile(profile_name, base_url, description, allow_overwrite=allow_overwrite)
+        print(f"Created profile '{profile_name}' with base URL '{base_url}'")
+        
+        # Ask if user wants to switch to this profile (if not already current)
+        current_profile = profile_manager.get_current_profile()
+        if current_profile != profile_name:
+            switch = input(f"Do you want to switch to profile '{profile_name}'? (y/N): ").strip().lower()
+            if switch in ['y', 'yes']:
+                profile_manager.set_current_profile(profile_name)
+                print(f"Switched to profile '{profile_name}'")
+        
+    except ValueError as e:
+        log.error(f"Failed to create profile: {e}")
+    except Exception as e:
+        log.error(f"Failed to create profile: {e}")
+
+def profile_remove(vars=None):
+    """Remove a custom profile"""
+    profile_name = vars.get('profile_name')
+    if not profile_name:
+        log.error("Profile name is required as a positional argument")
+        return
+    
+    try:
+        from rmaker_admin_lib.profile_manager import ProfileManager
+        profile_manager = ProfileManager()
+        
+        # Check if this is the current profile before deletion
+        current_profile = profile_manager.get_current_profile()
+        is_current = (current_profile == profile_name)
+        
+        # Confirm before deletion
+        confirmation = input(f"Are you sure you want to delete profile '{profile_name}'? (y/N): ").strip().lower()
+        if confirmation not in ['y', 'yes']:
+            print("Profile deletion cancelled.")
+            return
+        
+        profile_manager.delete_custom_profile(profile_name)
+        print(f"Deleted profile '{profile_name}'")
+        
+        # Inform user if they were switched to default
+        if is_current:
+            new_current = profile_manager.get_current_profile()
+            if new_current:
+                print(f"Switched to profile '{new_current}' (profile '{profile_name}' was the current profile)")
+        
+    except ValueError as e:
+        log.error(f"Failed to delete profile: {e}")
+    except Exception as e:
+        log.error(f"Failed to delete profile: {e}")
