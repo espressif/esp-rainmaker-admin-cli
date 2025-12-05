@@ -42,6 +42,27 @@ def main():
         # Setup CLI command for Account Logout Operations
         argparse_obj.set_sub_command(acc_cmd_subparser, 'logout')
 
+        # Setup CLI command for Account Profile Operations
+        profile_cmd_parser, profile_cmd_subparser = argparse_obj.set_command(
+            acc_cmd_subparser,
+            'profile',
+            dest='profile_ops')
+
+        # Setup CLI command for Profile List Operations
+        argparse_obj.set_sub_command(profile_cmd_subparser, 'profile_list')
+
+        # Setup CLI command for Profile Current Operations
+        argparse_obj.set_sub_command(profile_cmd_subparser, 'profile_current')
+
+        # Setup CLI command for Profile Switch Operations
+        argparse_obj.set_sub_command(profile_cmd_subparser, 'profile_switch')
+
+        # Setup CLI command for Profile Add Operations
+        argparse_obj.set_sub_command(profile_cmd_subparser, 'profile_add')
+
+        # Setup CLI command for Profile Remove Operations
+        argparse_obj.set_sub_command(profile_cmd_subparser, 'profile_remove')
+
         # Setup CLI command for Certs Operations
         certs_cmd_parser, certs_cmd_subparser = argparse_obj.set_command(
             parent_subparser,
@@ -71,6 +92,7 @@ def main():
         PARSER_HELP_PRINT = {
             'parent_ops': argparse_obj.parser,
             'account_ops': acc_cmd_parser,
+            'profile_ops': profile_cmd_parser,
             'certs_ops': certs_cmd_parser,
             'cacert_ops': cacert_cmd_parser,
             'devicecert_ops': devicecert_cmd_parser}

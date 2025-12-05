@@ -138,12 +138,23 @@ class Session:
 
     def get_access_token(self):
         '''
-        Get Access Token
+        Get Access Token - now profile-aware
         '''
         try:
             log.debug("Getting access token")
             config = Config()
-            config_data = config.read_config()
+
+            # Get tokens from profile
+            config_data = None
+            if config.profile_manager and config.current_profile:
+                idtoken, refreshtoken, accesstoken = config.profile_manager.get_profile_tokens(config.current_profile)
+                if accesstoken:
+                    config_data = {
+                        'idtoken': idtoken,
+                        'refreshtoken': refreshtoken,
+                        'accesstoken': accesstoken
+                    }
+
             if not config_data:
                 log.info("User is not logged in. Please login to continue")
                 log.debug('User config data not found. '
@@ -187,7 +198,20 @@ class Session:
                 key_text = str('refreshtoken')
                 new_config[key_text] = refresh_token
                 log.debug("New config data: {}".format(new_config))
-                ret_status = config.update_config(new_config)
+
+                # Use profile-aware token storage if available
+                if config.profile_manager and config.current_profile:
+                    config.profile_manager.set_profile_tokens(
+                        config.current_profile,
+                        idtoken=id_token,
+                        refreshtoken=refresh_token,
+                        accesstoken=access_token
+                    )
+                    # Also update legacy file for backward compatibility
+                    ret_status = config.update_config(new_config)
+                else:
+                    ret_status = config.update_config(new_config)
+
                 log.debug("Config data update status: {}".format(ret_status))
                 if not ret_status:
                     log.debug("Failed to update config.")
@@ -201,14 +225,25 @@ class Session:
 
     def get_curr_user_creds(self, email=None):
         '''
-        Get Current Logged In User Credentials
+        Get Current Logged In User Credentials - now profile-aware
 
         :param email: Attribute to get
         :type email: str
         '''
         try:
             config = Config()
-            config_data = config.read_config()
+
+            # Get tokens from profile
+            config_data = None
+            if config.profile_manager and config.current_profile:
+                idtoken, refreshtoken, accesstoken = config.profile_manager.get_profile_tokens(config.current_profile)
+                if idtoken:
+                    config_data = {
+                        'idtoken': idtoken,
+                        'refreshtoken': refreshtoken,
+                        'accesstoken': accesstoken
+                    }
+
             if not config_data:
                 return None
             id_token = config_data['idtoken']
@@ -224,12 +259,23 @@ class Session:
 
     def get_refresh_token(self):
         '''
-        Get Refresh Token
+        Get Refresh Token - now profile-aware
         '''
         try:
             log.debug("Getting Refresh token")
             config = Config()
-            config_data = config.read_config()
+
+            # Get tokens from profile
+            config_data = None
+            if config.profile_manager and config.current_profile:
+                idtoken, refreshtoken, accesstoken = config.profile_manager.get_profile_tokens(config.current_profile)
+                if refreshtoken:
+                    config_data = {
+                        'idtoken': idtoken,
+                        'refreshtoken': refreshtoken,
+                        'accesstoken': accesstoken
+                    }
+
             if not config_data:
                 log.info("User is not logged in. Please login to continue")
                 log.debug('User config data not found. '
