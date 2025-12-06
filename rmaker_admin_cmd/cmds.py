@@ -22,7 +22,7 @@ import datetime
 import traceback
 import shortuuid
 import csv
-import distutils.dir_util
+import json
 from rmaker_admin_lib.exceptions import FileError
 from rmaker_admin_lib.node_mfg import Node_Mfg
 from rmaker_admin_lib import configmanager
@@ -225,7 +225,7 @@ def _gen_common_files_dir(outdir):
     # Create output directory for all common files generated
     common_outdir = os.path.join(outdir, 'common')
     if not os.path.isdir(common_outdir):
-        distutils.dir_util.mkpath(common_outdir)
+        os.makedirs(common_outdir, exist_ok=True)
         log.debug("Directory created: {}".format(common_outdir))
     return common_outdir
 
@@ -1644,3 +1644,523 @@ def profile_remove(vars=None):
         log.error(f"Failed to delete profile: {e}")
     except Exception as e:
         log.error(f"Failed to delete profile: {e}")
+
+def _get_nested_value(obj, key_path):
+    '''
+    Get nested value from JSON object using dot notation
+
+    :param obj: JSON object to extract value from
+    :type obj: dict
+
+    :param key_path: Dot-separated key path (e.g., "connectivity.timestamp")
+    :type key_path: str
+
+    :return: Value at the key path, or None if not found
+    :rtype: any
+    '''
+    keys = key_path.split('.')
+    current = obj
+
+    for key in keys:
+        if isinstance(current, dict) and key in current:
+            current = current[key]
+        else:
+            return None
+
+    return current
+
+def _flatten_json_for_csv(obj, parent_key='', sep='.'):
+    '''
+    Flatten nested JSON object for CSV conversion
+
+    :param obj: JSON object to flatten
+    :type obj: dict, list, or primitive
+
+    :param parent_key: Parent key for nested objects
+    :type parent_key: str
+
+    :param sep: Separator for nested keys
+    :type sep: str
+
+    :return: Flattened dictionary
+    :rtype: dict
+    '''
+    items = []
+
+    if isinstance(obj, dict):
+        for key, value in iteritems(obj):
+            new_key = '{}{}{}'.format(parent_key, sep, key) if parent_key else key
+            if isinstance(value, dict):
+                # Recursively flatten nested dictionaries
+                items.extend(_flatten_json_for_csv(value, new_key, sep=sep).items())
+            elif isinstance(value, list):
+                # Convert lists to JSON string representation
+                items.append((new_key, json.dumps(value)))
+            else:
+                items.append((new_key, value))
+    elif isinstance(obj, list):
+        # Convert lists to JSON string representation
+        items.append((parent_key, json.dumps(obj)))
+    else:
+        items.append((parent_key, obj))
+
+    return dict(items)
+
+def _parse_download_query_params(query_str):
+    '''
+    Parse query string into dictionary
+
+    :param query_str: Query string to parse (e.g., "node_list=true&status=online")
+    :type query_str: str
+
+    :return: Dictionary of query parameters, or None if parsing fails
+    :rtype: dict or None
+    '''
+    params_dict = {}
+    if query_str:
+        try:
+            from urllib.parse import unquote
+            # Parse query string
+            for param in query_str.split('&'):
+                if '=' in param:
+                    key, value = param.split('=', 1)
+                    # URL decode the values
+                    key = unquote(key.strip())
+                    value = unquote(value.strip())
+                    params_dict[key] = value
+        except Exception as qp_err:
+            log.error("Error parsing query parameters: {}".format(qp_err))
+            return None
+    return params_dict
+
+def _validate_download_pages_arg(pages_arg):
+    '''
+    Validate and parse the pages argument
+
+    :param pages_arg: Pages argument value
+    :type pages_arg: str
+
+    :return: Tuple of (max_pages, fetch_all_pages) or (None, None) if invalid
+    :rtype: tuple
+    '''
+    try:
+        max_pages = int(pages_arg) if pages_arg else 1
+        if max_pages < 0:
+            log.error("--pages must be >= 0")
+            return None, None
+        fetch_all_pages = (max_pages == 0)
+        return max_pages, fetch_all_pages
+    except ValueError:
+        log.error("--pages must be a valid integer")
+        return None, None
+
+def _create_api_request_summary(request_url, base_query_params, csv_key, csv_columns, pages_requested, pages_fetched, items_collected):
+    '''
+    Create API request summary text for api_request.txt
+
+    :param request_url: The API request URL
+    :type request_url: str
+    :param base_query_params: Base query parameters dict
+    :type base_query_params: dict
+    :param csv_key: CSV key name (or empty string)
+    :type csv_key: str
+    :param csv_columns: CSV columns specification (or empty string)
+    :type csv_columns: str
+    :param pages_requested: Number of pages requested (0 for all)
+    :type pages_requested: int
+    :param pages_fetched: Actual number of pages fetched
+    :type pages_fetched: int
+    :param items_collected: Total items collected (0 if no csv_key)
+    :type items_collected: int
+
+    :return: Formatted summary text
+    :rtype: str
+    '''
+    summary_lines = []
+    summary_lines.append("Initial Request:")
+    summary_lines.append("URL: {}".format(request_url))
+
+    if base_query_params:
+        params_str = "&".join(["{}={}".format(k, v) for k, v in base_query_params.items()])
+        summary_lines.append("Base Query Params: {}".format(params_str))
+    else:
+        summary_lines.append("Base Query Params: (none)")
+
+    if csv_key:
+        summary_lines.append("CSV Key: {}".format(csv_key))
+
+    if csv_columns:
+        summary_lines.append("CSV Columns: {}".format(csv_columns))
+
+    pages_req_str = "all" if pages_requested == 0 else str(pages_requested)
+    summary_lines.append("Pages Requested: {}".format(pages_req_str))
+    summary_lines.append("")
+    summary_lines.append("Pagination Summary:")
+    summary_lines.append("Total Pages Fetched: {}".format(pages_fetched))
+
+    if csv_key:
+        summary_lines.append("Total Items Collected: {}".format(items_collected))
+
+    summary_lines.append("Pagination Method: start_id based")
+
+    return "\n".join(summary_lines)
+
+def _fetch_paginated_api_data(request_url, request_headers, base_query_params, max_pages, fetch_all_pages, csv_key):
+    '''
+    Fetch paginated data from API
+
+    :param request_url: The API request URL
+    :type request_url: str
+    :param request_headers: Request headers dict
+    :type request_headers: dict
+    :param base_query_params: Base query parameters
+    :type base_query_params: dict
+    :param max_pages: Maximum pages to fetch
+    :type max_pages: int
+    :param fetch_all_pages: Whether to fetch all pages
+    :type fetch_all_pages: bool
+    :param csv_key: CSV key to extract (or empty string)
+    :type csv_key: str
+
+    :return: Tuple of (first_page_response, all_list_items, pages_fetched)
+    :rtype: tuple
+    :raises: Various exceptions from requests library
+    '''
+    import requests
+    from rmaker_admin_lib.exceptions import SSLError, NetworkError, RequestTimeoutError
+
+    all_list_items = []
+    first_page_response = None
+    current_page = 1
+    next_id = None
+
+    while True:
+        # Prepare query params for this request
+        page_query_params = base_query_params.copy()
+        if next_id:
+            page_query_params['start_id'] = next_id
+
+        log.debug('Fetching page {} - query params: {}'.format(current_page, page_query_params))
+
+        response = requests.get(
+            url=request_url,
+            headers=request_headers,
+            params=page_query_params if page_query_params else None,
+            verify=configmanager.CERT_FILE,
+            timeout=(30.0, 30.0)
+        )
+
+        log.debug("Response status code received: {}".format(response.status_code))
+
+        # Check if request was successful
+        response.raise_for_status()
+
+        # Parse JSON response
+        json_data = json.loads(response.text)
+
+        # Store first page response
+        if current_page == 1:
+            first_page_response = json_data.copy()
+
+        # Extract list items if csv_key is provided
+        if csv_key and csv_key in json_data:
+            list_value = json_data[csv_key]
+            if isinstance(list_value, list):
+                all_list_items.extend(list_value)
+                log.debug("Page {}: Added {} items (total: {})".format(
+                    current_page, len(list_value), len(all_list_items)))
+
+        # Check for next_id to determine if there are more pages
+        next_id = json_data.get('next_id')
+        has_more_pages = (next_id is not None and next_id != 'null' and str(next_id).lower() != 'null')
+
+        # Check if we should continue fetching pages
+        if fetch_all_pages:
+            if not has_more_pages:
+                log.debug("Reached end of pagination (no next_id)")
+                break
+        else:
+            if current_page >= max_pages:
+                log.debug("Reached requested page limit ({})".format(max_pages))
+                break
+            if not has_more_pages:
+                log.debug("Reached end of pagination (no next_id)")
+                break
+
+        current_page += 1
+
+    return first_page_response, all_list_items, current_page
+
+def _save_api_response_file(output_dir, first_page_response, csv_key):
+    '''
+    Save API response to file (excluding csv_key if provided)
+
+    :param output_dir: Output directory path
+    :type output_dir: str
+    :param first_page_response: First page JSON response
+    :type first_page_response: dict
+    :param csv_key: CSV key to exclude (or empty string)
+    :type csv_key: str
+
+    :return: Output file path
+    :rtype: str
+    '''
+    api_response_filename = 'api_response.txt'
+    output_file = os.path.join(output_dir, api_response_filename)
+
+    with open(output_file, 'w') as f:
+        if first_page_response is not None:
+            # Create a copy to modify
+            response_to_save = first_page_response.copy()
+            # Remove csv_key if provided
+            if csv_key and csv_key in response_to_save:
+                del response_to_save[csv_key]
+            f.write(json.dumps(response_to_save, indent=2))
+
+    return output_file
+
+def _convert_list_to_csv(output_dir, all_list_items, csv_key, csv_columns_str):
+    '''
+    Convert list items to CSV file
+
+    :param output_dir: Output directory path
+    :type output_dir: str
+    :param all_list_items: List of items to convert
+    :type all_list_items: list
+    :param csv_key: CSV key name
+    :type csv_key: str
+    :param csv_columns_str: Comma-separated column names (or empty string)
+    :type csv_columns_str: str
+
+    :return: Tuple of (csv_file_path, row_count) or (None, 0) if no items
+    :rtype: tuple
+    '''
+    if len(all_list_items) == 0:
+        log.warn("Array '{}' is empty after fetching all pages. No CSV file will be created.".format(csv_key))
+        return None, 0
+
+    # Parse columns if provided
+    custom_columns = []
+    if csv_columns_str:
+        custom_columns = [h.strip() for h in csv_columns_str.split(',') if h.strip()]
+        log.debug("Custom columns specified: {}".format(custom_columns))
+
+    # Collect all unique keys from all objects in the array
+    all_keys = set()
+    flattened_rows = []
+
+    for item in all_list_items:
+        if isinstance(item, dict):
+            # Flatten nested objects
+            flattened = _flatten_json_for_csv(item)
+            flattened_rows.append(flattened)
+            all_keys.update(flattened.keys())
+        else:
+            # Handle primitive values
+            flattened_rows.append({csv_key: item})
+            all_keys.add(csv_key)
+
+    # Determine which columns to use
+    if custom_columns:
+        sorted_keys = []
+        for column in custom_columns:
+            if column in all_keys:
+                sorted_keys.append(column)
+            else:
+                # Check if it's a dot notation path
+                sorted_keys.append(column)
+                log.debug("Column '{}' not found in flattened keys, will try dot notation extraction".format(column))
+    else:
+        # Sort keys for consistent column order
+        sorted_keys = sorted(all_keys)
+        if 'node_id' in sorted_keys:
+            sorted_keys.remove('node_id')
+            sorted_keys.insert(0, 'node_id')
+
+    # Create CSV file
+    csv_filename = 'list.csv'
+    csv_file = os.path.join(output_dir, csv_filename)
+
+    with open(csv_file, 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=sorted_keys)
+        writer.writeheader()
+
+        for idx, item in enumerate(all_list_items):
+            row = {}
+
+            if custom_columns:
+                # Extract values using custom columns (support dot notation)
+                for column in sorted_keys:
+                    if isinstance(item, dict):
+                        # Try to extract using dot notation from original object
+                        value = _get_nested_value(item, column)
+                        if value is not None:
+                            # Convert lists/dicts to JSON string
+                            if isinstance(value, (list, dict)):
+                                row[column] = json.dumps(value)
+                            else:
+                                row[column] = value
+                        else:
+                            # Fallback to flattened data
+                            if idx < len(flattened_rows) and column in flattened_rows[idx]:
+                                row[column] = flattened_rows[idx][column]
+                            else:
+                                row[column] = ''
+                    else:
+                        # Handle primitive values
+                        if idx < len(flattened_rows) and column in flattened_rows[idx]:
+                            row[column] = flattened_rows[idx][column]
+                        else:
+                            row[column] = ''
+            else:
+                # Use flattened data
+                row = {key: flattened_rows[idx].get(key, '') for key in sorted_keys}
+
+            writer.writerow(row)
+
+    return csv_file, len(all_list_items)
+
+def download_api(vars=None):
+    '''
+    Download API response to file
+
+    :param vars: `api` as key - API endpoint path (e.g., /admin/nodes)
+                 `out` as key - Output folder name (default: downloads)
+                 `csv_key` as key - Optional: Key name in JSON response to extract as CSV
+                 `csv_columns` as key - Optional: Comma-separated column names for CSV
+                 `query_params` as key - Optional: Query parameters for API request
+                 `pages` as key - Optional: Number of pages to fetch (default: 1, 0 for all)
+    :type vars: dict
+
+    :raises Exception: If there is any exception while downloading
+            KeyboardInterrupt: If there is a keyboard interrupt by user
+
+    :return: None on Failure
+    :rtype: None
+    '''
+    try:
+        log.debug("Download API command")
+
+        # Step 1: Verify server config and validate required arguments
+        ret_server_status = _verify_serverconfig_exists()
+        if not ret_server_status:
+            return
+
+        ret_status = _cli_arg_check(vars['api'], '--api <api>')
+        if not ret_status:
+            return
+
+        # Step 2: Get access token for authentication
+        session = Session()
+        access_token = session.get_access_token()
+        if not access_token:
+            log.error("User is not logged in. Please login to continue")
+            return
+
+        # Step 3: Build request URL
+        from rmaker_admin_lib import constants
+        backslash = '/'
+        api_path = vars['api'].strip(backslash)
+        request_url = constants.API_URL.rstrip(backslash) + backslash + constants.VERSION + backslash + api_path
+
+        # Step 4: Parse and validate arguments
+        base_query_params = _parse_download_query_params(vars.get('query_params', ''))
+        if base_query_params is None:
+            return
+
+        pages_arg = vars.get('pages', '1')
+        max_pages, fetch_all_pages = _validate_download_pages_arg(pages_arg)
+        if max_pages is None:
+            return
+
+        log.debug("Pages to fetch: {} (fetch_all={})".format(max_pages, fetch_all_pages))
+
+        log.debug('Sending HTTP GET request - url: {}'.format(request_url))
+
+        # Step 5: Set up request headers with access token
+        request_headers = {
+            'content-type': 'application/json',
+            'Authorization': access_token
+        }
+
+        # Step 6: Import required libraries
+        try:
+            import requests
+            from requests.exceptions import RequestException
+        except ImportError as err:
+            log.error("{}\nPlease run `pip install -r requirements.txt`\n".format(err))
+            return
+
+        from rmaker_admin_lib.exceptions import SSLError, NetworkError, RequestTimeoutError
+
+        # Step 7: Get argument values
+        csv_key = vars.get('csv_key', '')
+        csv_columns_str = vars.get('csv_columns', '')
+        output_folder = vars.get('out', 'downloads')
+
+        try:
+            # Step 8: Fetch paginated data from API
+            first_page_response, all_list_items, pages_fetched = _fetch_paginated_api_data(
+                request_url, request_headers, base_query_params,
+                max_pages, fetch_all_pages, csv_key
+            )
+
+            # Step 9: Create timestamp-based output directory
+            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+            timestamped_dir = os.path.join(output_folder, timestamp)
+            if not os.path.isdir(timestamped_dir):
+                os.makedirs(timestamped_dir)
+                log.debug("Created timestamped directory: {}".format(timestamped_dir))
+
+            # Step 10: Create API request summary file
+            api_request_file = os.path.join(timestamped_dir, 'api_request.txt')
+            summary_text = _create_api_request_summary(
+                request_url, base_query_params, csv_key, csv_columns_str,
+                max_pages, pages_fetched, len(all_list_items)
+            )
+            with open(api_request_file, 'w') as f:
+                f.write(summary_text)
+            log.info("API request summary saved: {}".format(api_request_file))
+
+            # Step 11: Save API response file
+            api_response_file = _save_api_response_file(timestamped_dir, first_page_response, csv_key)
+            if csv_key:
+                log.info("API response saved: {} (first page, csv_key excluded)".format(api_response_file))
+            else:
+                log.info("API response saved: {} (first page only)".format(api_response_file))
+
+            if csv_key:
+                log.info("Fetched {} pages, collected {} total items".format(pages_fetched, len(all_list_items)))
+
+            # Step 12: Convert to CSV if csv_key is provided
+            if csv_key:
+                try:
+                    csv_file, row_count = _convert_list_to_csv(
+                        timestamped_dir, all_list_items, csv_key, csv_columns_str
+                    )
+                    if csv_file:
+                        log.info("CSV file created: {} ({} rows)".format(csv_file, row_count))
+                except json.JSONDecodeError as json_err:
+                    log.error("Failed to parse JSON response: {}".format(json_err))
+                except Exception as csv_err:
+                    log.error("Error creating CSV file: {}".format(csv_err))
+
+        except SSLError as ssl_err:
+            log.error("SSL Error: {}".format(ssl_err))
+        except NetworkError as net_err:
+            log.error("Network Error: {}".format(net_err))
+        except RequestTimeoutError as req_err:
+            log.error("Request Timeout Error: {}".format(req_err))
+        except RequestException as req_exc_err:
+            log.error("Request Exception: {}".format(req_exc_err))
+            if hasattr(req_exc_err, 'response') and req_exc_err.response is not None:
+                log.error("Response status code: {}".format(req_exc_err.response.status_code))
+                log.error("Response text: {}".format(req_exc_err.response.text))
+        except Exception as err:
+            log.error("Error downloading API response: {}".format(err))
+            raise
+
+    except KeyboardInterrupt:
+        log.error("\nDownload cancelled")
+    except Exception as e:
+        log.error("Error: {}".format(e))
