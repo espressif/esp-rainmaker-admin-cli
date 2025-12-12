@@ -38,9 +38,13 @@ try:
     
     # Fall back to serverconfig.py if no profile base_url found
     if not base_url and os.path.exists(SERVER_CONFIG_FILE):
-        from rmaker_admin_lib import serverconfig
-        base_url = serverconfig.BASE_URL
-        log.debug(f"Using BASE_URL from serverconfig.py: {base_url}")
+        try:
+            from rmaker_admin_lib import serverconfig
+            base_url = serverconfig.BASE_URL
+            log.debug(f"Using BASE_URL from serverconfig.py: {base_url}")
+        except Exception as e:
+            log.debug(f"Failed to import or read serverconfig: {type(e).__name__} - {str(e)}")
+            base_url = None
     
     if base_url:
         backslash = '/'
@@ -52,7 +56,9 @@ try:
         API_URL = None
 
 except Exception as e:
-    log.debug(e)
+    import traceback
+    log.debug("Exception while initializing constants: {} - {}".format(type(e).__name__, str(e)))
+    log.debug("Traceback: {}".format(traceback.format_exc()))
     # Don't exit - let it fail gracefully when HOST/API_URL are accessed
     HOST = None
     API_URL = None

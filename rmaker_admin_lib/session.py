@@ -20,13 +20,33 @@ import base64
 import socket
 from rmaker_admin_lib import configmanager
 from rmaker_admin_lib.configmanager import Config
-from rmaker_admin_lib.logger import log
+from rmaker_admin_lib.logger import log, _mask_sensitive_payload
 from rmaker_admin_lib.user import User
 from rmaker_admin_lib.exceptions import InvalidConfigError
 from rmaker_admin_lib.exceptions import SSLError,\
     NetworkError,\
     RequestTimeoutError,\
     InvalidApiVersionError
+
+
+def _mask_token(token):
+    '''
+    Mask sensitive token data for logging purposes
+
+    :param token: Token string to mask
+    :type token: str
+
+    :return: Masked token string
+    :rtype: str
+    '''
+    if not token:
+        return '[NO_TOKEN]'
+    if len(token) <= 8:
+        return '[REDACTED]'
+    # Show first 8 chars and indicate it's redacted
+    return '{}...[REDACTED]'.format(token[:8])
+
+
 try:
     import requests
     from requests.exceptions import RequestException
@@ -34,12 +54,22 @@ try:
 except ImportError as err:
     log.error("{}\nPlease run `pip install -r requirements.txt`\n".format(err))
     sys.exit(1)
+# Import constants (which handles serverconfig import gracefully)
+# Only import if serverconfig file exists (like the old working code)
+# Don't exit on failure - let download_api check serverconfig via _verify_serverconfig_exists()
 try:
     if os.path.exists(configmanager.SERVER_CONFIG_FILE):
         from rmaker_admin_lib import serverconfig, constants
+    else:
+        # If serverconfig file doesn't exist, set constants to None
+        # download_api will check and prompt user to configure
+        constants = None
 except Exception as e:
-    log.debug("Import serverconfig failed")
-    sys.exit(1)
+    log.debug("Import constants failed: {} - {}".format(type(e).__name__, str(e)))
+    # Set constants to None so we can check for it later
+    constants = None
+    # Don't exit - let it fail gracefully when constants are accessed
+    # The download_api function will check serverconfig existence via _verify_serverconfig_exists()
 
 
 class Session:
@@ -50,6 +80,14 @@ class Session:
         '''
         Check if API version is valid
         '''
+        # Check if constants are available (serverconfig might not be configured)
+        try:
+            if not constants or not hasattr(constants, 'HOST') or not constants.HOST:
+                log.debug("Constants not available (serverconfig not configured)")
+                return None
+        except (AttributeError, TypeError) as e:
+            log.debug("Constants not properly initialized: {}".format(e))
+            return None
         backslash = '/'
         log.debug("Checking API Version")
         socket.setdefaulttimeout(10)
@@ -88,8 +126,13 @@ class Session:
         except RequestException as req_exc_err:
             log.error(req_exc_err)
             return None
+        except AttributeError as attr_err:
+            # constants.HOST or constants.VERSION might be None if serverconfig not configured
+            log.debug("Constants not properly initialized: {}".format(attr_err))
+            return None
         except Exception as err:
-            raise Exception(err)
+            log.debug("Unexpected error in version check: {}".format(err))
+            return None
         return False
 
     def get_token_attribute(self, attribute_name, token):
@@ -106,10 +149,18 @@ class Session:
         token_payload = token.split('.')[1]
         if len(token_payload) % 4:
             token_payload += '=' * (4 - len(token_payload) % 4)
-        log.debug("Token Payload: {}".format(token_payload))
+        log.debug("Token Payload: {}".format(_mask_token(token_payload)))
         try:
             str_token_payload = base64.b64decode(token_payload).decode("utf-8")
-            log.debug("Token Playload String: {}".format(str_token_payload))
+            # Parse JSON to extract only non-sensitive fields for logging
+            try:
+                payload_json = json.loads(str_token_payload)
+                # Log only non-sensitive fields (exclude tokens, secrets, etc.)
+                safe_payload = {k: v for k, v in payload_json.items()
+                               if k not in ['token', 'secret', 'password', 'refresh_token', 'access_token']}
+                log.debug("Token Payload (safe fields only): {}".format(safe_payload))
+            except:
+                log.debug("Token Payload String: [REDACTED]")
             attribute_value = json.loads(str_token_payload)[attribute_name]
             log.debug("Attribute Value: {}".format(attribute_value))
             if attribute_value is None:
@@ -160,7 +211,7 @@ class Session:
                 log.debug('User config data not found. '
                           'Please login to continue')
                 return False
-            log.debug("Config data: {}".format(config_data))
+            log.debug("Config data: {}".format(_mask_sensitive_payload(config_data)))
             if 'accesstoken' not in config_data:
                 log.error('Access Token not found in current login '
                           'config data from '
@@ -180,12 +231,14 @@ class Session:
                     log.error(InvalidApiVersionError())
                     return False
                 elif valid_ver_status is None:
-                    return False
+                    # Version check failed (network error, constants not available, etc.)
+                    # But allow token refresh to proceed - version check is just validation
+                    log.debug("Version check returned None, proceeding with token refresh anyway")
                 refresh_token = config_data['refreshtoken']
                 user = User(email_id)
                 access_token, id_token = user.get_new_token(refresh_token)
                 log.debug('New config data received - access token: {} '
-                          'id token: {}'.format(access_token, id_token))
+                          'id token: {}'.format(_mask_token(access_token), _mask_token(id_token)))
                 if not access_token and not id_token:
                     log.debug("Error getting new user token")
                     log.info("Previous Session expired. Cannot extend session. Please login to continue")
@@ -197,7 +250,7 @@ class Session:
                 new_config[key_text] = id_token
                 key_text = str('refreshtoken')
                 new_config[key_text] = refresh_token
-                log.debug("New config data: {}".format(new_config))
+                log.debug("New config data: {}".format(_mask_sensitive_payload(new_config)))
 
                 # Use profile-aware token storage if available
                 if config.profile_manager and config.current_profile:
@@ -220,7 +273,9 @@ class Session:
             log.debug("Current Session is valid")
             return access_token
         except Exception as err:
-            log.debug("Error while getting access token")
+            import traceback
+            log.debug("Error while getting access token: {} - {}".format(type(err).__name__, str(err)))
+            log.debug("Traceback: {}".format(traceback.format_exc()))
             return False
 
     def get_curr_user_creds(self, email=None):
@@ -281,7 +336,7 @@ class Session:
                 log.debug('User config data not found. '
                           'Please login to continue')
                 return False
-            log.debug("Config data: {}".format(config_data))
+            log.debug("Config data: {}".format(_mask_sensitive_payload(config_data)))
             if 'refreshtoken' not in config_data:
                 log.debug('Refresh Token not found in current login '
                           'config data from '

@@ -450,8 +450,8 @@ python rainmaker_admin_cli.py download --api <api> [--out <folder>] [--csv_key <
 
 - `--api <api>` (required): API endpoint path (e.g., `/admin/nodes`)
 - `--out <folder>` (optional): Output folder name where files will be saved. Default: `downloads`
-- `--csv_key <key>` (optional): Key name in JSON response to extract as CSV. The value must be an array (e.g., `node_info`). If not provided, only the API response will be saved (useful for understanding the API structure).
-- `--csv_columns <columns>` (optional): Comma-separated list of column names for CSV. Supports dot notation for nested keys (e.g., `connectivity.timestamp`). If provided, CSV will only contain these columns in the specified order.
+- `--csv_key <key>` (optional): Key name in JSON response to extract as CSV. The value must be an array (e.g., `node_info`). Supports nested paths using dot notation (e.g., `ts_data.params.values`). Use empty string `""` if the API response itself is directly an array (e.g., `[{...}, {...}]`). If not provided, only the API response will be saved (useful for understanding the API structure).
+- `--csv_columns <columns>` (optional): Comma-separated list of column names for CSV. Supports dot notation for nested keys (e.g., `connectivity.timestamp`). Use `^` prefix to extract fields from parent context when extracting nested arrays (e.g., `^param_name` to get `param_name` from the parent object). If provided, CSV will only contain these columns in the specified order.
 - `--query_params <params>` (optional): Query parameters for API request (e.g., `node_list=true&status=online`)
 - `--pages <num>` (optional): Number of pages to query. Default: 1. Use `0` to query all pages until end.
 
@@ -471,7 +471,7 @@ The timestamp format is `YYYYMMDD_HHMMSS` (e.g., `20251113_105742`), ensuring ea
 
 **File descriptions:**
 - `api_request.txt`: Summary of the API request including URL, query parameters, CSV settings, and pagination statistics
-- `api_response.txt`: Contains the first page API response (without the csv_key if `--csv_key` is provided)
+- `api_response.txt`: Contains the complete first page API response as-is (unmodified)
 - `list.csv`: Contains the extracted CSV data (only created if `--csv_key` is provided)
 
 #### Pagination
@@ -482,6 +482,8 @@ The download command automatically handles pagination:
 - **Multiple pages**: Use `--pages <num>` to fetch a specific number of pages
 - **All pages**: Use `--pages 0` to fetch all pages until the end
 - **Pagination detection**: Stops when `next_id` is absent, `null`, or `"null"` in the response
+  - For object responses: Checks top-level `next_id`, then nested locations (e.g., `array[0].next_id`)
+  - **Note**: Direct array responses (root is an array) are not paginated and will only fetch a single page
 - **Query params**: User-provided `--query_params` are included in all page requests
 - **CSV accumulation**: When using `--csv_key`, items from all fetched pages are combined into a single CSV file
 
@@ -512,6 +514,18 @@ python rainmaker_admin_cli.py download --api "/admin/nodes" --csv_key "node_info
 python rainmaker_admin_cli.py download --api "/admin/nodes" --csv_key "node_info" --csv_columns "node_id,status.connectivity.connected,status.connectivity.timestamp"
 ```
 
+**Download with nested array extraction and parent context:**
+```sh
+python rainmaker_admin_cli.py download --api "/admin/nodes/simple_tsdata" --csv_key "ts_data.params.values" --csv_columns "^param_name,ts,val" --query_params "data_type=string&node_id=simple_ts_node_3&param_name=text"
+```
+> Note: When extracting nested arrays (e.g., `ts_data.params.values`), use `^param_name` to include fields from the parent object (`params` in this case). The `^` prefix extracts the field from the parent context, while regular column names extract from the array items themselves.
+
+**Download when API response is directly an array:**
+```sh
+python rainmaker_admin_cli.py download --api "/admin/api_paths_method" --csv_key "" --csv_columns "path,methods"
+```
+> Note: When the API response is directly an array (e.g., `[{...}, {...}]`), use empty string `""` for `--csv_key` to extract the array directly. The response structure will be checked to ensure it's an array. **Note**: Direct array responses are not paginated and will only fetch a single page.
+
 **Download with query parameters:**
 ```sh
 python rainmaker_admin_cli.py download --api "/admin/nodes" --csv_key "node_info" --query_params "status=online&node_list=true"
@@ -536,7 +550,9 @@ python rainmaker_admin_cli.py download --api "/admin/nodes" --out "nodes_export"
 
 - **Authentication**: You must be logged in to use this command (see [Login](#login))
 - **Understanding API structure**: Run the command without `--csv_key` first to see the API response structure and identify which key contains the data you want to extract
-- **CSV key exclusion**: When `--csv_key` is provided, the csv_key is excluded from `api_response.txt` to avoid storing large paginated arrays
+- **Direct array responses**: If the API response is directly an array (e.g., `[{...}, {...}]`), use empty string `""` for `--csv_key` to extract the array directly
+- **Nested array extraction**: Use dot notation in `--csv_key` to extract nested arrays (e.g., `ts_data.params.values`). Arrays in the path are automatically traversed and flattened.
+- **Parent context fields**: When extracting nested arrays, use `^` prefix in `--csv_columns` to include fields from parent objects. For example, `^param_name` extracts `param_name` from the parent `params` object when extracting `values` array. The `^` prefix is stripped from the CSV header (e.g., `^param_name` appears as `param_name` in the CSV).
 - **Dot notation**: Use dot notation (e.g., `status.connectivity.timestamp`) to access nested JSON fields in `--csv_columns`
 - **Array handling**: Arrays and nested objects in CSV are converted to JSON string format
 - **Column ordering**: If `--csv_columns` is provided, columns appear in the exact order specified. Otherwise, `node_id` is placed first (if present), followed by other columns alphabetically

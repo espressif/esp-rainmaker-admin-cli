@@ -18,11 +18,13 @@ import json
 import sys
 import os
 import socket
-from rmaker_admin_lib.logger import log
+from rmaker_admin_lib.logger import log, _mask_sensitive_headers, _mask_sensitive_payload
 from rmaker_admin_lib import configmanager
 from rmaker_admin_lib.exceptions import SSLError,\
     NetworkError,\
     RequestTimeoutError
+
+
 try:
     import requests
     from requests.exceptions import RequestException
@@ -30,12 +32,22 @@ except ImportError as err:
     log.error('{}\nPlease run `pip install -r requirements.txt`'
               '\n'.format(err))
     sys.exit(1)
+# Import constants (which handles serverconfig import gracefully)
+# Only import if serverconfig file exists (like the old working code)
+# Don't exit on failure - let download_api check serverconfig via _verify_serverconfig_exists()
 try:
     if os.path.exists(configmanager.SERVER_CONFIG_FILE):
         from rmaker_admin_lib import serverconfig, constants
+    else:
+        # If serverconfig file doesn't exist, set constants to None
+        # download_api will check and prompt user to configure
+        constants = None
 except Exception as e:
-    log.debug("Import serverconfig failed")
-    sys.exit(1)
+    log.debug("Import constants failed: {} - {}".format(type(e).__name__, str(e)))
+    # Set constants to None so we can check for it later
+    constants = None
+    # Don't exit - let it fail gracefully when constants are accessed
+    # The download_api function will check serverconfig existence via _verify_serverconfig_exists()
 
 
 class User:
@@ -81,6 +93,11 @@ class User:
                 'password': password
             }
 
+            # Check if constants is available before using it
+            if not constants or not hasattr(constants, 'HOST') or not constants.HOST:
+                error_msg = "Server configuration not available. Please configure using 'account serverconfig' command."
+                log.error(error_msg)
+                return False
             login_url = constants.HOST.rstrip(backslash) + backslash + path
 
             # New user pool migration error code
@@ -166,6 +183,11 @@ class User:
                 'refreshtoken': refresh_token
             }
 
+            # Check if constants is available before using it
+            if not constants or not hasattr(constants, 'HOST') or not constants.HOST:
+                error_msg = "Server configuration not available. Please configure using 'account serverconfig' command."
+                log.error(error_msg)
+                return False, False
             request_url = constants.HOST.rstrip(backslash) + backslash + path
             log.debug('Sending HTTP POST Request - request url: {} '
                       'request body: {}'.format(
@@ -221,6 +243,11 @@ class User:
             socket.setdefaulttimeout(10)
             # Set HTTP Request
             path = 'logout2'
+            # Check if constants is available before using it
+            if not constants or not hasattr(constants, 'HOST') or not constants.HOST:
+                error_msg = "Server configuration not available. Please configure using 'account serverconfig' command."
+                log.error(error_msg)
+                return False
             logout_url = constants.HOST.rstrip(backslash) + backslash + path
 
             # Set request headers with access token
@@ -235,7 +262,9 @@ class User:
             }
 
             log.debug('Sending HTTP POST Request - logout url: {} '
-                      'headers: {} payload: {}'.format(logout_url, request_headers, json.dumps(request_payload)))
+                      'headers: {} payload: {}'.format(logout_url,
+                                                       _mask_sensitive_headers(request_headers),
+                                                       json.dumps(_mask_sensitive_payload(request_payload))))
 
             # Send HTTP POST Request
             response = requests.post(url=logout_url,
