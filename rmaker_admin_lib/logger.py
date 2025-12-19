@@ -49,3 +49,50 @@ console_handler.setFormatter(console_formatter)
 # Add handlers to logger
 log.addHandler(file_handler)
 log.addHandler(console_handler)
+
+
+def _mask_sensitive_headers(headers):
+    '''
+    Mask sensitive data in request headers for logging
+
+    :param headers: Request headers dict
+    :type headers: dict
+
+    :return: Headers dict with sensitive values masked
+    :rtype: dict
+    '''
+    if not headers:
+        return headers
+    masked = headers.copy()
+    if 'Authorization' in masked:
+        token = masked['Authorization']
+        if token and len(token) > 8:
+            masked['Authorization'] = '{}...[REDACTED]'.format(token[:8])
+        else:
+            masked['Authorization'] = '[REDACTED]'
+    return masked
+
+
+def _mask_sensitive_payload(payload):
+    '''
+    Mask sensitive data in request payload for logging
+
+    :param payload: Request payload dict
+    :type payload: dict
+
+    :return: Payload dict with sensitive values masked
+    :rtype: dict
+    '''
+    if not payload:
+        return payload
+    masked = payload.copy()
+    sensitive_keys = ['refresh_token', 'refreshtoken', 'access_token', 'accesstoken',
+                      'id_token', 'idtoken', 'password', 'secret', 'token']
+    for key in sensitive_keys:
+        if key in masked:
+            value = masked[key]
+            if value and len(str(value)) > 8:
+                masked[key] = '{}...[REDACTED]'.format(str(value)[:8])
+            else:
+                masked[key] = '[REDACTED]'
+    return masked

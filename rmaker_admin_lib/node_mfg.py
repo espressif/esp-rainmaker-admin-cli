@@ -23,7 +23,7 @@ from rmaker_admin_lib.exceptions import SSLError,\
     NetworkError,\
     RequestTimeoutError,\
     InvalidJSONError
-from rmaker_admin_lib.logger import log
+from rmaker_admin_lib.logger import log, _mask_sensitive_headers
 try:
     import requests
     from requests.exceptions import RequestException
@@ -52,7 +52,7 @@ class Node_Mfg:
         """
         self.request_header = {'content-type': 'application/json',
                                'Authorization': token}
-        log.debug("Node Mfg request header: {}".format(self.request_header))
+        log.debug("Node Mfg request header: {}".format(_mask_sensitive_headers(self.request_header)))
 
     def get_node_id_req(self, node_cnt, expected_resp=None):
         '''

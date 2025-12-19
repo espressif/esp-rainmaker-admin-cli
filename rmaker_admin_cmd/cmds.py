@@ -23,7 +23,7 @@ import traceback
 import shortuuid
 import csv
 import json
-from rmaker_admin_lib.exceptions import FileError
+from rmaker_admin_lib.exceptions import FileError, CLIError
 from rmaker_admin_lib.node_mfg import Node_Mfg
 from rmaker_admin_lib import configmanager
 from rmaker_admin_lib.certs import *
@@ -1453,32 +1453,32 @@ def profile_list(vars=None):
         from rmaker_admin_lib.profile_manager import ProfileManager
         profile_manager = ProfileManager()
         current_profile = profile_manager.get_current_profile()
-        
+
         profiles = profile_manager.list_profiles()
-        
+
         if not profiles:
             print("No profiles found. Use 'account serverconfig' to create a profile.")
             return
-        
+
         print("Available profiles:")
         print("-" * 50)
-        
+
         for profile_name, profile_config in profiles.items():
             is_current = " (current)" if profile_name == current_profile else ""
             print(f"  {profile_name}{is_current}")
             print(f"    Description: {profile_config.get('description', 'N/A')}")
-            
+
             if profile_config.get('base_url'):
                 print(f"    Base URL: {profile_config['base_url']}")
-            
+
             # Check if user is logged in to this profile
             if profile_manager.has_profile_tokens(profile_name):
                 print(f"    Status: Logged in")
             else:
                 print(f"    Status: Not logged in")
-            
+
             print()
-        
+
     except Exception as e:
         log.error(f"Failed to list profiles: {e}")
 
@@ -1488,22 +1488,22 @@ def profile_current(vars=None):
         from rmaker_admin_lib.profile_manager import ProfileManager
         profile_manager = ProfileManager()
         current_profile = profile_manager.get_current_profile()
-        
+
         if not current_profile:
             print("No profile is currently set.")
             print("Use 'account serverconfig' to create and set a profile.")
             return
-        
+
         profile_config = profile_manager.get_profile_config(current_profile)
-        
+
         print(f"Current profile: {current_profile}")
         print(f"Description: {profile_config.get('description', 'N/A')}")
-        
+
         if profile_config.get('base_url'):
             print(f"Base URL: {profile_config['base_url']}")
         else:
             print("Base URL: Not configured")
-        
+
         # Check login status
         if profile_manager.has_profile_tokens(current_profile):
             try:
@@ -1518,7 +1518,7 @@ def profile_current(vars=None):
                 print(f"Login status: Logged in")
         else:
             print(f"Login status: Not logged in")
-        
+
     except Exception as e:
         log.error(f"Failed to get profile information: {e}")
 
@@ -1528,25 +1528,25 @@ def profile_switch(vars=None):
     if not profile_name:
         log.error("Profile name is required as a positional argument")
         return
-    
+
     try:
         from rmaker_admin_lib.profile_manager import ProfileManager
         profile_manager = ProfileManager()
-        
+
         if not profile_manager.profile_exists(profile_name):
             print(f"Profile '{profile_name}' does not exist.")
             print("Use 'account profile list' to see available profiles.")
             return
-        
+
         # Check if already on this profile
         current_profile = profile_manager.get_current_profile()
         if current_profile == profile_name:
             print(f"Profile '{profile_name}' is already the current profile.")
             return
-        
+
         profile_manager.set_current_profile(profile_name)
         print(f"Switched to profile '{profile_name}'")
-        
+
     except Exception as e:
         log.error(f"Failed to switch profile: {e}")
 
@@ -1556,34 +1556,34 @@ def profile_add(vars=None):
     # Handle both --base-url and --base_url for compatibility
     base_url = vars.get('base-url') or vars.get('base_url')
     description = vars.get('description')
-    
+
     if not profile_name:
         log.error("Profile name is required as a positional argument")
         return
-    
+
     if not base_url:
         log.error("Base URL is required. Use --base-url <url>")
         return
-    
+
     try:
         from rmaker_admin_lib.profile_manager import ProfileManager
         profile_manager = ProfileManager()
-        
+
         # Check if profile already exists
         if profile_manager.profile_exists(profile_name):
             current_profile = profile_manager.get_current_profile()
             is_current = (current_profile == profile_name)
-            
+
             print(f"\nProfile '{profile_name}' already exists.")
             if is_current:
                 print(f"Warning: '{profile_name}' is currently the active profile.")
             print("This will overwrite the existing profile configuration.")
-            
+
             confirmation = input(f"Do you want to overwrite profile '{profile_name}'? (y/N): ").strip().lower()
             if confirmation not in ['y', 'yes']:
                 print("Profile creation cancelled.")
                 return
-            
+
             # Delete the existing profile first (this handles current profile switching)
             # Exception: default profile can't be deleted, so we'll update it directly
             if profile_name != ProfileManager.DEFAULT_PROFILE_NAME:
@@ -1591,12 +1591,12 @@ def profile_add(vars=None):
                     profile_manager.delete_custom_profile(profile_name)
                 except ValueError as e:
                     raise
-        
+
         # Create or update the profile (allow overwrite if profile exists)
         allow_overwrite = profile_manager.profile_exists(profile_name)
         profile_manager.create_custom_profile(profile_name, base_url, description, allow_overwrite=allow_overwrite)
         print(f"Created profile '{profile_name}' with base URL '{base_url}'")
-        
+
         # Ask if user wants to switch to this profile (if not already current)
         current_profile = profile_manager.get_current_profile()
         if current_profile != profile_name:
@@ -1604,7 +1604,7 @@ def profile_add(vars=None):
             if switch in ['y', 'yes']:
                 profile_manager.set_current_profile(profile_name)
                 print(f"Switched to profile '{profile_name}'")
-        
+
     except ValueError as e:
         log.error(f"Failed to create profile: {e}")
     except Exception as e:
@@ -1616,30 +1616,30 @@ def profile_remove(vars=None):
     if not profile_name:
         log.error("Profile name is required as a positional argument")
         return
-    
+
     try:
         from rmaker_admin_lib.profile_manager import ProfileManager
         profile_manager = ProfileManager()
-        
+
         # Check if this is the current profile before deletion
         current_profile = profile_manager.get_current_profile()
         is_current = (current_profile == profile_name)
-        
+
         # Confirm before deletion
         confirmation = input(f"Are you sure you want to delete profile '{profile_name}'? (y/N): ").strip().lower()
         if confirmation not in ['y', 'yes']:
             print("Profile deletion cancelled.")
             return
-        
+
         profile_manager.delete_custom_profile(profile_name)
         print(f"Deleted profile '{profile_name}'")
-        
+
         # Inform user if they were switched to default
         if is_current:
             new_current = profile_manager.get_current_profile()
             if new_current:
                 print(f"Switched to profile '{new_current}' (profile '{profile_name}' was the current profile)")
-        
+
     except ValueError as e:
         log.error(f"Failed to delete profile: {e}")
     except Exception as e:
@@ -1667,6 +1667,114 @@ def _get_nested_value(obj, key_path):
         else:
             return None
 
+    return current
+
+def _extract_nested_array(obj, key_path):
+    '''
+    Extract nested array from JSON object using dot notation.
+    Supports traversing arrays in the path by flattening them.
+    When extracting arrays, includes parent context fields (sibling fields from parent objects).
+
+    :param obj: JSON object to extract array from
+    :type obj: dict
+
+    :param key_path: Dot-separated key path (e.g., "ts_data.params.values")
+                     Arrays in the path will be traversed/flattened
+                     Parent context fields will be included in extracted items
+    :type key_path: str
+
+    :return: Flattened list of items from the nested array, or empty list if not found
+             Each item will include parent context fields if applicable
+    :rtype: list
+    '''
+    keys = key_path.split('.')
+    current = [obj]  # Start with a list containing the root object
+
+    for idx, key in enumerate(keys):
+        next_level = []
+        for item in current:
+            if isinstance(item, dict) and key in item:
+                value = item[key]
+                if isinstance(value, list):
+                    # If it's a list, add all items to next_level
+                    # If this is the last key, include parent context fields
+                    if idx == len(keys) - 1:
+                        # Last key - include parent context
+                        for list_item in value:
+                            if isinstance(list_item, dict):
+                                # Merge parent fields (excluding the key we're extracting)
+                                # Store parent fields with _parent_ prefix for ^ syntax support
+                                merged_item = {}
+                                # Add parent fields with _parent_ prefix
+                                for k, v in iteritems(item):
+                                    if k != key:
+                                        merged_item['_parent_' + k] = v
+                                # Add list item fields (child fields)
+                                merged_item.update(list_item)
+                                next_level.append(merged_item)
+                            else:
+                                next_level.append(list_item)
+                    else:
+                        next_level.extend(value)
+                else:
+                    # If it's not a list, add it as a single item
+                    # If this is the last key and value is a dict, include parent context
+                    if idx == len(keys) - 1 and isinstance(value, dict):
+                        # Last key - include parent context for single object
+                        merged_item = {}
+                        # Add parent fields with _parent_ prefix
+                        for k, v in iteritems(item):
+                            if k != key:
+                                merged_item['_parent_' + k] = v
+                        # Add the value's fields (child fields)
+                        merged_item.update(value)
+                        next_level.append(merged_item)
+                    else:
+                        next_level.append(value)
+            elif isinstance(item, list):
+                # If current item is a list, process each element
+                for sub_item in item:
+                    if isinstance(sub_item, dict) and key in sub_item:
+                        value = sub_item[key]
+                        if isinstance(value, list):
+                            # If this is the last key, include parent context
+                            if idx == len(keys) - 1:
+                                for list_item in value:
+                                    if isinstance(list_item, dict):
+                                        # Merge parent fields (excluding the key we're extracting)
+                                        # Store parent fields with _parent_ prefix for ^ syntax support
+                                        merged_item = {}
+                                        # Add parent fields with _parent_ prefix
+                                        for k, v in iteritems(sub_item):
+                                            if k != key:
+                                                merged_item['_parent_' + k] = v
+                                        # Add list item fields (child fields)
+                                        merged_item.update(list_item)
+                                        next_level.append(merged_item)
+                                    else:
+                                        next_level.append(list_item)
+                            else:
+                                next_level.extend(value)
+                        else:
+                            # If this is the last key and value is a dict, include parent context
+                            if idx == len(keys) - 1 and isinstance(value, dict):
+                                # Last key - include parent context for single object
+                                merged_item = {}
+                                # Add parent fields with _parent_ prefix
+                                for k, v in iteritems(sub_item):
+                                    if k != key:
+                                        merged_item['_parent_' + k] = v
+                                # Add the value's fields (child fields)
+                                merged_item.update(value)
+                                next_level.append(merged_item)
+                            else:
+                                next_level.append(value)
+        if not next_level:
+            return []
+        current = next_level
+
+    # Final result should be a flat list
+    # current already contains the final items (which should be the values from the last array)
     return current
 
 def _flatten_json_for_csv(obj, parent_key='', sep='.'):
@@ -1786,8 +1894,15 @@ def _create_api_request_summary(request_url, base_query_params, csv_key, csv_col
     else:
         summary_lines.append("Base Query Params: (none)")
 
-    if csv_key:
+    # Only show CSV Key if it was actually provided and used
+    # If csv_key is empty string and no items were collected, treat as "not provided"
+    if csv_key is not None and csv_key:
+        # csv_key is a non-empty string
         summary_lines.append("CSV Key: {}".format(csv_key))
+    elif csv_key == "" and items_collected > 0:
+        # csv_key is empty string and items were collected (direct array extraction worked)
+        summary_lines.append("CSV Key: (empty - direct array)")
+    # If csv_key is None or empty string with 0 items, don't show CSV Key line (not provided or not used)
 
     if csv_columns:
         summary_lines.append("CSV Columns: {}".format(csv_columns))
@@ -1798,20 +1913,21 @@ def _create_api_request_summary(request_url, base_query_params, csv_key, csv_col
     summary_lines.append("Pagination Summary:")
     summary_lines.append("Total Pages Fetched: {}".format(pages_fetched))
 
-    if csv_key:
+    # Only show items collected if csv_key was actually used (not None and not empty with 0 items)
+    if csv_key is not None and (csv_key or items_collected > 0):
         summary_lines.append("Total Items Collected: {}".format(items_collected))
 
     summary_lines.append("Pagination Method: start_id based")
 
     return "\n".join(summary_lines)
 
-def _fetch_paginated_api_data(request_url, request_headers, base_query_params, max_pages, fetch_all_pages, csv_key):
+def _fetch_paginated_api_data(request_url, request_headers, base_query_params, max_pages, fetch_all_pages, csv_key, csv_writer_info=None, session=None):
     '''
     Fetch paginated data from API
 
     :param request_url: The API request URL
     :type request_url: str
-    :param request_headers: Request headers dict
+    :param request_headers: Request headers dict (will be updated with refreshed token if needed)
     :type request_headers: dict
     :param base_query_params: Base query parameters
     :type base_query_params: dict
@@ -1821,6 +1937,10 @@ def _fetch_paginated_api_data(request_url, request_headers, base_query_params, m
     :type fetch_all_pages: bool
     :param csv_key: CSV key to extract (or empty string)
     :type csv_key: str
+    :param csv_writer_info: Optional tuple of (csv_writer, header_names) for incremental CSV writing
+    :type csv_writer_info: tuple or None
+    :param session: Optional Session object for token refresh
+    :type session: Session or None
 
     :return: Tuple of (first_page_response, all_list_items, pages_fetched)
     :rtype: tuple
@@ -1833,8 +1953,23 @@ def _fetch_paginated_api_data(request_url, request_headers, base_query_params, m
     first_page_response = None
     current_page = 1
     next_id = None
+    consecutive_empty_pages = 0  # Track consecutive pages with no items extracted
+    csv_writer = None
+    header_names = None
+    if csv_writer_info:
+        csv_writer, header_names = csv_writer_info
 
     while True:
+        # Refresh token before each request (or every 5 pages to reduce overhead)
+        if session and (current_page == 1 or current_page % 5 == 0):
+            new_access_token = session.get_access_token()
+            if new_access_token:
+                request_headers['Authorization'] = new_access_token
+                log.debug("Refreshed access token before page {}".format(current_page))
+            else:
+                log.error("Failed to refresh access token. Session may have expired.")
+                raise Exception("Access token refresh failed. Please login again.")
+
         # Prepare query params for this request
         page_query_params = base_query_params.copy()
         if next_id:
@@ -1853,29 +1988,180 @@ def _fetch_paginated_api_data(request_url, request_headers, base_query_params, m
         log.debug("Response status code received: {}".format(response.status_code))
 
         # Check if request was successful
+        # If 401 Unauthorized, try refreshing token once and retry
+        if response.status_code == 401 and session:
+            log.debug("Received 401 Unauthorized, attempting token refresh")
+            new_access_token = session.get_access_token()
+            if new_access_token and new_access_token != request_headers.get('Authorization'):
+                request_headers['Authorization'] = new_access_token
+                log.debug("Token refreshed, retrying request")
+                # Retry the request with new token
+                response = requests.get(
+                    url=request_url,
+                    headers=request_headers,
+                    params=page_query_params if page_query_params else None,
+                    verify=configmanager.CERT_FILE,
+                    timeout=(30.0, 30.0)
+                )
+                log.debug("Retry response status code: {}".format(response.status_code))
+
         response.raise_for_status()
 
         # Parse JSON response
         json_data = json.loads(response.text)
 
+        # Log response structure for debugging
+        if current_page <= 3:
+            log.debug("Page {} response keys: {}".format(current_page, list(json_data.keys()) if isinstance(json_data, dict) else 'not a dict'))
+
         # Store first page response
         if current_page == 1:
             first_page_response = json_data.copy()
+            # If csv_key is provided, check if it exists in the first page
+            # If not found, abort immediately instead of fetching subsequent pages
+            # Note: csv_key can be None (not provided) or a string (provided, including empty string for direct array)
+            if csv_key is not None:
+                # Special case: if csv_key is empty string, treat response as directly an array
+                if csv_key == "":
+                    if not isinstance(json_data, list):
+                        # Empty csv_key with non-array response: treat as "not provided", skip CSV extraction
+                        csv_key = None
+                        log.debug("Empty csv_key provided but response is not an array. Skipping CSV extraction.")
+                # Check if csv_key is a nested path (contains dot)
+                elif '.' in csv_key:
+                    # Try to extract nested array
+                    nested_array = _extract_nested_array(json_data, csv_key)
+                    if not nested_array:
+                        error_msg = "CSV key path '{}' not found or empty in the first page response. Aborting.".format(csv_key)
+                        raise CLIError(error_msg)
+                else:
+                    # Check if response is directly an array (not an object)
+                    if isinstance(json_data, list):
+                        # Response is directly an array, csv_key should be empty or we treat it as such
+                        if csv_key:
+                            error_msg = "Response is directly an array, but csv_key '{}' was provided. Use empty csv_key ('') to extract the array directly, or check the API response structure.".format(csv_key)
+                            raise CLIError(error_msg)
+                    elif isinstance(json_data, dict):
+                        # Check for top-level key
+                        if csv_key not in json_data:
+                            error_msg = "CSV key '{}' not found in the first page response. Aborting.".format(csv_key)
+                            raise CLIError(error_msg)
+                    else:
+                        error_msg = "Unexpected response type. Expected object or array, got: {}".format(type(json_data).__name__)
+                        raise CLIError(error_msg)
 
-        # Extract list items if csv_key is provided
-        if csv_key and csv_key in json_data:
-            list_value = json_data[csv_key]
-            if isinstance(list_value, list):
-                all_list_items.extend(list_value)
-                log.debug("Page {}: Added {} items (total: {})".format(
-                    current_page, len(list_value), len(all_list_items)))
+        # Extract list items if csv_key is provided (including empty string for direct array)
+        if csv_key is not None:
+            page_items = []
+            # Special case: empty csv_key means response is directly an array
+            if csv_key == "":
+                if isinstance(json_data, list):
+                    page_items = json_data
+                    if csv_writer:
+                        # Write incrementally (csv_writer is actually the wrapper function)
+                        for item in page_items:
+                            csv_writer(item, header_names)
+                        log.debug("Page {}: Wrote {} items to CSV from direct array response".format(
+                            current_page, len(page_items)))
+                    else:
+                        # Accumulate for later writing
+                        all_list_items.extend(page_items)
+                        log.debug("Page {}: Added {} items from direct array response (total: {})".format(
+                            current_page, len(page_items), len(all_list_items)))
+                        # Reset consecutive empty pages counter if we found items
+                        if len(page_items) > 0:
+                            consecutive_empty_pages = 0
+                        else:
+                            consecutive_empty_pages += 1
+            # Check if csv_key is a nested path (contains dot)
+            elif '.' in csv_key:
+                # Extract nested array
+                nested_array = _extract_nested_array(json_data, csv_key)
+                if nested_array:
+                    page_items = nested_array
+                    if csv_writer:
+                        # Write incrementally (csv_writer is actually the wrapper function)
+                        for item in page_items:
+                            csv_writer(item, header_names)
+                        log.debug("Page {}: Wrote {} items to CSV from nested path '{}'".format(
+                            current_page, len(page_items), csv_key))
+                    else:
+                        # Accumulate for later writing
+                        all_list_items.extend(page_items)
+                        log.debug("Page {}: Added {} items from nested path '{}' (total: {})".format(
+                            current_page, len(page_items), csv_key, len(all_list_items)))
+                        # Reset consecutive empty pages counter if we found items
+                        if len(page_items) > 0:
+                            consecutive_empty_pages = 0
+                        else:
+                            consecutive_empty_pages += 1
+            elif isinstance(json_data, dict) and csv_key in json_data:
+                list_value = json_data[csv_key]
+                if isinstance(list_value, list):
+                    page_items = list_value
+                    if csv_writer:
+                        # Write incrementally (csv_writer is actually the wrapper function)
+                        for item in page_items:
+                            csv_writer(item, header_names)
+                        log.debug("Page {}: Wrote {} items to CSV".format(
+                            current_page, len(page_items)))
+                    else:
+                        # Accumulate for later writing
+                        all_list_items.extend(page_items)
+                        log.debug("Page {}: Added {} items (total: {})".format(
+                            current_page, len(page_items), len(all_list_items)))
+                        # Reset consecutive empty pages counter if we found items
+                        if len(page_items) > 0:
+                            consecutive_empty_pages = 0
+                        else:
+                            consecutive_empty_pages += 1
+
+        # Show progress every 5 pages (after processing the page)
+        if current_page % 5 == 0:
+            if csv_writer:
+                log.info("Progress: Completed {} pages, continuing...".format(current_page))
+            else:
+                log.info("Progress: Completed {} pages, collected {} items so far...".format(current_page, len(all_list_items)))
 
         # Check for next_id to determine if there are more pages
-        next_id = json_data.get('next_id')
-        has_more_pages = (next_id is not None and next_id != 'null' and str(next_id).lower() != 'null')
+        # Try top level first, then check nested structures (common pattern: inside first array element)
+        # Note: Direct array responses (root is array) are not paginated, so skip next_id detection for them
+        next_id = None
+        if isinstance(json_data, dict):
+            next_id = json_data.get('next_id')
+            if next_id is None:
+                # Check if next_id is nested inside arrays/objects (e.g., ts_data[0].next_id)
+                for key, value in iteritems(json_data):
+                    if isinstance(value, list) and len(value) > 0:
+                        # Check first element of array
+                        first_elem = value[0]
+                        if isinstance(first_elem, dict) and 'next_id' in first_elem:
+                            next_id = first_elem.get('next_id')
+                            log.debug("Found nested next_id in {}[0].next_id: {}".format(key, next_id))
+                            break
+                    elif isinstance(value, dict) and 'next_id' in value:
+                        # Check nested object
+                        next_id = value.get('next_id')
+                        log.debug("Found nested next_id in {}.next_id: {}".format(key, next_id))
+                        break
+        # Direct array responses are not paginated, so next_id will remain None
+
+        # Check if next_id is valid (not None, not 'null', not empty string)
+        has_more_pages = (
+            next_id is not None
+            and next_id != 'null'
+            and str(next_id).lower() != 'null'
+            and str(next_id).strip() != ''
+        )
+
+        log.debug("Page {}: next_id={}, has_more_pages={}".format(current_page, next_id, has_more_pages))
 
         # Check if we should continue fetching pages
         if fetch_all_pages:
+            # If csv_key is provided and we've had 3+ consecutive empty pages, stop
+            if csv_key is not None and consecutive_empty_pages >= 3:
+                log.warn("Stopping pagination: {} consecutive pages with no items extracted. Possible end of data or extraction issue.".format(consecutive_empty_pages))
+                break
             if not has_more_pages:
                 log.debug("Reached end of pagination (no next_id)")
                 break
@@ -1891,16 +2177,14 @@ def _fetch_paginated_api_data(request_url, request_headers, base_query_params, m
 
     return first_page_response, all_list_items, current_page
 
-def _save_api_response_file(output_dir, first_page_response, csv_key):
+def _save_api_response_file(output_dir, first_page_response):
     '''
-    Save API response to file (excluding csv_key if provided)
+    Save API response to file (first page as-is, without modification)
 
     :param output_dir: Output directory path
     :type output_dir: str
     :param first_page_response: First page JSON response
     :type first_page_response: dict
-    :param csv_key: CSV key to exclude (or empty string)
-    :type csv_key: str
 
     :return: Output file path
     :rtype: str
@@ -1910,14 +2194,90 @@ def _save_api_response_file(output_dir, first_page_response, csv_key):
 
     with open(output_file, 'w') as f:
         if first_page_response is not None:
-            # Create a copy to modify
-            response_to_save = first_page_response.copy()
-            # Remove csv_key if provided
-            if csv_key and csv_key in response_to_save:
-                del response_to_save[csv_key]
-            f.write(json.dumps(response_to_save, indent=2))
+            f.write(json.dumps(first_page_response, indent=2))
 
     return output_file
+
+def _init_incremental_csv_writer(output_dir, csv_columns_str):
+    '''
+    Initialize CSV writer for incremental writing when csv_columns is provided
+
+    :param output_dir: Output directory path
+    :type output_dir: str
+    :param csv_columns_str: Comma-separated column names
+    :type csv_columns_str: str
+
+    :return: Tuple of (csv_file_path, csv_file_handle, csv_writer, header_names)
+    :rtype: tuple
+    '''
+    csv_filename = 'list.csv'
+    csv_file = os.path.join(output_dir, csv_filename)
+    csv_f = open(csv_file, 'w', newline='')
+
+    # Parse columns
+    custom_columns = [h.strip() for h in csv_columns_str.split(',') if h.strip()]
+    header_names = []
+    for column in custom_columns:
+        # Check if column uses ^ prefix (parent field)
+        if column.startswith('^'):
+            # Strip ^ prefix for CSV header
+            header_name = column[1:]
+            header_names.append((column, header_name))
+        else:
+            header_names.append((column, column))
+
+    # Extract header names from tuples
+    header_names_list = [header_name for _, header_name in header_names]
+
+    writer = csv.DictWriter(csv_f, fieldnames=header_names_list)
+    writer.writeheader()
+
+    return csv_file, csv_f, writer, header_names
+
+def _write_csv_row_incremental(writer, item, header_names, flattened_rows_cache=None):
+    '''
+    Write a single row to CSV incrementally
+
+    :param writer: CSV DictWriter instance
+    :type writer: csv.DictWriter
+    :param item: Item to write as CSV row
+    :type item: dict
+    :param header_names: List of (lookup_key, header_name) tuples
+    :type header_names: list
+    :param flattened_rows_cache: Optional cache for flattened data (not used in incremental mode)
+    :type flattened_rows_cache: list
+
+    :return: None
+    '''
+    row = {}
+    for lookup_key, header_name in header_names:
+        if isinstance(item, dict):
+            # Check if column uses ^ prefix (parent field)
+            if lookup_key.startswith('^'):
+                # Extract from parent context (stored with _parent_ prefix)
+                parent_column_name = lookup_key[1:]
+                parent_key = '_parent_' + parent_column_name
+                if parent_key in item:
+                    value = item[parent_key]
+                    if isinstance(value, (list, dict)):
+                        row[header_name] = json.dumps(value)
+                    else:
+                        row[header_name] = value
+                else:
+                    row[header_name] = ''
+            else:
+                # Regular column - try to extract using dot notation
+                value = _get_nested_value(item, lookup_key)
+                if value is not None:
+                    if isinstance(value, (list, dict)):
+                        row[header_name] = json.dumps(value)
+                    else:
+                        row[header_name] = value
+                else:
+                    row[header_name] = ''
+        else:
+            row[header_name] = ''
+    writer.writerow(row)
 
 def _convert_list_to_csv(output_dir, all_list_items, csv_key, csv_columns_str):
     '''
@@ -1936,7 +2296,10 @@ def _convert_list_to_csv(output_dir, all_list_items, csv_key, csv_columns_str):
     :rtype: tuple
     '''
     if len(all_list_items) == 0:
-        log.warn("Array '{}' is empty after fetching all pages. No CSV file will be created.".format(csv_key))
+        # Only warn if csv_key was actually provided (not None, including empty string)
+        if csv_key is not None:
+            csv_key_display = csv_key if csv_key else "(empty - direct array)"
+            log.warn("Array '{}' is empty after fetching all pages. No CSV file will be created.".format(csv_key_display))
         return None, 0
 
     # Parse columns if provided
@@ -1964,12 +2327,19 @@ def _convert_list_to_csv(output_dir, all_list_items, csv_key, csv_columns_str):
     if custom_columns:
         sorted_keys = []
         for column in custom_columns:
-            if column in all_keys:
-                sorted_keys.append(column)
+            # Check if column uses ^ prefix (parent field)
+            if column.startswith('^'):
+                # Strip ^ prefix for CSV header (cleaner display)
+                header_name = column[1:]  # Remove ^ prefix
+                sorted_keys.append((column, header_name))  # Store (lookup_key, header_name) tuple
+                log.debug("Column '{}' will extract from parent context (header: '{}')".format(column, header_name))
             else:
-                # Check if it's a dot notation path
-                sorted_keys.append(column)
-                log.debug("Column '{}' not found in flattened keys, will try dot notation extraction".format(column))
+                if column in all_keys:
+                    sorted_keys.append((column, column))  # Store as tuple for consistency
+                else:
+                    # Check if it's a dot notation path
+                    sorted_keys.append((column, column))  # Store as tuple for consistency
+                    log.debug("Column '{}' not found in flattened keys, will try dot notation extraction".format(column))
     else:
         # Sort keys for consistent column order
         sorted_keys = sorted(all_keys)
@@ -1981,40 +2351,70 @@ def _convert_list_to_csv(output_dir, all_list_items, csv_key, csv_columns_str):
     csv_filename = 'list.csv'
     csv_file = os.path.join(output_dir, csv_filename)
 
+    # Extract header names from tuples (or use column names directly if not using custom columns)
+    if custom_columns and isinstance(sorted_keys[0] if sorted_keys else None, tuple):
+        header_names = [header_name for _, header_name in sorted_keys]
+    else:
+        header_names = sorted_keys
+
     with open(csv_file, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=sorted_keys)
+        writer = csv.DictWriter(f, fieldnames=header_names)
         writer.writeheader()
 
         for idx, item in enumerate(all_list_items):
             row = {}
 
             if custom_columns:
-                # Extract values using custom columns (support dot notation)
-                for column in sorted_keys:
+                # Extract values using custom columns (support dot notation and ^ prefix for parent fields)
+                for lookup_key, header_name in sorted_keys:
                     if isinstance(item, dict):
-                        # Try to extract using dot notation from original object
-                        value = _get_nested_value(item, column)
-                        if value is not None:
-                            # Convert lists/dicts to JSON string
-                            if isinstance(value, (list, dict)):
-                                row[column] = json.dumps(value)
+                        # Check if column uses ^ prefix (parent field)
+                        if lookup_key.startswith('^'):
+                            # Extract from parent context (stored with _parent_ prefix)
+                            parent_column_name = lookup_key[1:]  # Remove ^ prefix
+                            parent_key = '_parent_' + parent_column_name
+                            # Try to get from parent context first
+                            if parent_key in item:
+                                value = item[parent_key]
+                                # Convert lists/dicts to JSON string
+                                if isinstance(value, (list, dict)):
+                                    row[header_name] = json.dumps(value)
+                                else:
+                                    row[header_name] = value
                             else:
-                                row[column] = value
+                                # Fallback: try dot notation on parent context
+                                value = _get_nested_value(item, parent_key)
+                                if value is not None:
+                                    if isinstance(value, (list, dict)):
+                                        row[header_name] = json.dumps(value)
+                                    else:
+                                        row[header_name] = value
+                                else:
+                                    row[header_name] = ''
                         else:
-                            # Fallback to flattened data
-                            if idx < len(flattened_rows) and column in flattened_rows[idx]:
-                                row[column] = flattened_rows[idx][column]
+                            # Regular column - try to extract using dot notation from original object
+                            value = _get_nested_value(item, lookup_key)
+                            if value is not None:
+                                # Convert lists/dicts to JSON string
+                                if isinstance(value, (list, dict)):
+                                    row[header_name] = json.dumps(value)
+                                else:
+                                    row[header_name] = value
                             else:
-                                row[column] = ''
+                                # Fallback to flattened data
+                                if idx < len(flattened_rows) and lookup_key in flattened_rows[idx]:
+                                    row[header_name] = flattened_rows[idx][lookup_key]
+                                else:
+                                    row[header_name] = ''
                     else:
                         # Handle primitive values
-                        if idx < len(flattened_rows) and column in flattened_rows[idx]:
-                            row[column] = flattened_rows[idx][column]
+                        if idx < len(flattened_rows) and lookup_key in flattened_rows[idx]:
+                            row[header_name] = flattened_rows[idx][lookup_key]
                         else:
-                            row[column] = ''
+                            row[header_name] = ''
             else:
                 # Use flattened data
-                row = {key: flattened_rows[idx].get(key, '') for key in sorted_keys}
+                row = {key: flattened_rows[idx].get(key, '') for key in header_names}
 
             writer.writerow(row)
 
@@ -2073,6 +2473,25 @@ def download_api(vars=None):
         if max_pages is None:
             return
 
+        # Step 7: Get argument values
+        csv_key = vars.get('csv_key', '')
+
+        # Check if csv_key was actually provided (not just default empty string)
+        # CLI parser sets default to '', so we need to check if it's in vars to distinguish
+        # between "not provided" (default '') and "explicitly provided as ''"
+        csv_key_provided = 'csv_key' in vars
+        
+        # If csv_key is empty string and wasn't explicitly provided, treat as not provided
+        if csv_key == '' and not csv_key_provided:
+            csv_key = None  # Treat as "not provided"
+
+        # If csv_key is not provided, only fetch first page
+        if csv_key is None:
+            if max_pages > 1 or fetch_all_pages:
+                log.info("csv_key not provided. Fetching only first page (multiple pages not needed without csv_key).")
+            max_pages = 1
+            fetch_all_pages = False
+
         log.debug("Pages to fetch: {} (fetch_all={})".format(max_pages, fetch_all_pages))
 
         log.debug('Sending HTTP GET request - url: {}'.format(request_url))
@@ -2093,17 +2512,14 @@ def download_api(vars=None):
 
         from rmaker_admin_lib.exceptions import SSLError, NetworkError, RequestTimeoutError
 
-        # Step 7: Get argument values
-        csv_key = vars.get('csv_key', '')
+        # Step 7: Get remaining argument values
         csv_columns_str = vars.get('csv_columns', '')
         output_folder = vars.get('out', 'downloads')
 
         try:
-            # Step 8: Fetch paginated data from API
-            first_page_response, all_list_items, pages_fetched = _fetch_paginated_api_data(
-                request_url, request_headers, base_query_params,
-                max_pages, fetch_all_pages, csv_key
-            )
+            # Step 8: Show disclaimer for large datasets
+            if max_pages > 1 or fetch_all_pages:
+                log.info("Fetching multiple pages. This may take time...")
 
             # Step 9: Create timestamp-based output directory
             timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -2112,28 +2528,65 @@ def download_api(vars=None):
                 os.makedirs(timestamped_dir)
                 log.debug("Created timestamped directory: {}".format(timestamped_dir))
 
-            # Step 10: Create API request summary file
+            # Step 10: Initialize incremental CSV writer if csv_columns is provided
+            csv_writer_info = None
+            csv_file_handle = None
+            csv_file_path = None
+            row_count = [0]  # Use list to allow modification in nested function
+            if csv_key is not None and csv_columns_str:
+                try:
+                    csv_file_path, csv_file_handle, csv_writer, header_names = _init_incremental_csv_writer(
+                        timestamped_dir, csv_columns_str)
+                    # Create wrapper function to track row count
+                    def write_row_with_count(item, header_names):
+                        _write_csv_row_incremental(csv_writer, item, header_names)
+                        row_count[0] += 1
+                    csv_writer_info = (write_row_with_count, header_names)
+                    log.debug("Initialized incremental CSV writer")
+                except Exception as csv_init_err:
+                    log.warn("Failed to initialize incremental CSV writer, will use batch mode: {}".format(csv_init_err))
+                    csv_writer_info = None
+
+            # Step 11: Fetch paginated data from API
+            try:
+                first_page_response, all_list_items, pages_fetched = _fetch_paginated_api_data(
+                    request_url, request_headers, base_query_params,
+                    max_pages, fetch_all_pages, csv_key, csv_writer_info, session
+                )
+            finally:
+                # Close CSV file if incremental writing was used
+                if csv_file_handle:
+                    csv_file_handle.close()
+                    if csv_file_path and row_count[0] > 0:
+                        log.info("CSV file created: {} ({} rows)".format(csv_file_path, row_count[0]))
+
+            # Step 12: Create API request summary file
             api_request_file = os.path.join(timestamped_dir, 'api_request.txt')
+            # Use row_count if incremental writing was used, otherwise use len(all_list_items)
+            items_count = row_count[0] if csv_writer_info else len(all_list_items)
             summary_text = _create_api_request_summary(
                 request_url, base_query_params, csv_key, csv_columns_str,
-                max_pages, pages_fetched, len(all_list_items)
+                max_pages, pages_fetched, items_count
             )
             with open(api_request_file, 'w') as f:
                 f.write(summary_text)
             log.info("API request summary saved: {}".format(api_request_file))
 
-            # Step 11: Save API response file
-            api_response_file = _save_api_response_file(timestamped_dir, first_page_response, csv_key)
-            if csv_key:
-                log.info("API response saved: {} (first page, csv_key excluded)".format(api_response_file))
-            else:
-                log.info("API response saved: {} (first page only)".format(api_response_file))
+            # Step 13: Save API response file
+            api_response_file = _save_api_response_file(timestamped_dir, first_page_response)
+            log.info("API response saved: {} (first page)".format(api_response_file))
 
-            if csv_key:
-                log.info("Fetched {} pages, collected {} total items".format(pages_fetched, len(all_list_items)))
+            # Only log CSV-related messages if csv_key was actually provided (not None)
+            if csv_key is not None:
+                if csv_writer_info:
+                    log.info("Fetched {} pages, wrote {} total items to CSV incrementally".format(pages_fetched, row_count[0]))
+                else:
+                    log.info("Fetched {} pages, collected {} total items".format(pages_fetched, len(all_list_items)))
 
-            # Step 12: Convert to CSV if csv_key is provided
-            if csv_key:
+            # Step 14: Convert to CSV if csv_key is provided and NOT using incremental writing
+            # Only convert if csv_key is not None (including empty string for direct arrays)
+            # Also check if we actually have items to convert (avoid warning when csv_key wasn't provided)
+            if csv_key is not None and not csv_writer_info and len(all_list_items) > 0:
                 try:
                     csv_file, row_count = _convert_list_to_csv(
                         timestamped_dir, all_list_items, csv_key, csv_columns_str
@@ -2145,6 +2598,8 @@ def download_api(vars=None):
                 except Exception as csv_err:
                     log.error("Error creating CSV file: {}".format(csv_err))
 
+        except CLIError as cli_err:
+            log.error("{}".format(cli_err))
         except SSLError as ssl_err:
             log.error("SSL Error: {}".format(ssl_err))
         except NetworkError as net_err:

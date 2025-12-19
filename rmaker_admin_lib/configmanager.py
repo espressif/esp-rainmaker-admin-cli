@@ -84,7 +84,8 @@ class Config():
             with open(self.config_file, "r") as config_file:
                 user_config_data = json.load(config_file)
 
-            log.debug("Config data received: {}".format(user_config_data))
+            from rmaker_admin_lib.logger import _mask_sensitive_payload
+            log.debug("Config data received: {}".format(_mask_sensitive_payload(user_config_data)))
 
             return user_config_data
 
@@ -148,7 +149,8 @@ class Config():
             config_data['idtoken'] = data['idtoken']
             config_data['accesstoken'] = data['accesstoken']
             config_data['refreshtoken'] = data['refreshtoken']
-            log.debug("Login config data set: {}".format(config_data))
+            from rmaker_admin_lib.logger import _mask_sensitive_payload
+            log.debug("Login config data set: {}".format(_mask_sensitive_payload(config_data)))
             return config_data
         except KeyError as key_err:
             log.error("Key Error in login config data: {}".format(key_err))
