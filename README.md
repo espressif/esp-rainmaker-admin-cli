@@ -108,19 +108,100 @@ The Admin CLI commands are divided into 2 broad categories
 
 ### Account Operations
 
+The Admin CLI uses a **profile-based system** to manage multiple server configurations. Each profile can have its own server endpoint and login credentials, allowing you to easily switch between different RainMaker deployments (e.g., development, staging, production).
+
 #### Server Config
 
 You need to setup server configuration to get started. The endpoint would be your deployment's Base URL of the form `https://xxxx/amazonaws.com/dev` which you would have received on the super admin email configured during RainMaker deployment.
 
+When you run `serverconfig` for the first time, it creates a profile named `default` with the specified endpoint. You can create additional profiles using the `account profile add` command.
 
 Usage:
 
-`python rainmaker_admin_cli.py account serverconfig --endpoint <endpoint>`
+`python rainmaker_admin_cli.py account serverconfig --endpoint <endpoint> [--profile <profile_name>]`
+
+Optional arguments:
+- `--profile <profile_name>`: Profile name to use (defaults to 'default'). If the profile doesn't exist, it will be created.
+
+#### Profile Management
+
+Profiles allow you to manage multiple server configurations and switch between them. Each profile stores its own server endpoint and login credentials separately.
+
+##### List Profiles
+
+List all available profiles and see which one is currently active.
+
+Usage:
+
+`python rainmaker_admin_cli.py account profile list`
+
+This command displays:
+- All available profiles
+- Which profile is currently active (marked with "(current)")
+- Description and base URL for each profile
+- Login status for each profile
+
+##### Show Current Profile
+
+Display information about the currently active profile.
+
+Usage:
+
+`python rainmaker_admin_cli.py account profile current`
+
+This command shows:
+- Current profile name
+- Profile description
+- Base URL configuration
+- Login status
+
+##### Switch Profile
+
+Switch to a different profile. This changes the active profile for subsequent CLI operations.
+
+Usage:
+
+`python rainmaker_admin_cli.py account profile switch <profile_name>`
+
+> **Note**: After switching profiles, you may need to login again if the new profile doesn't have stored credentials.
+
+##### Add Profile
+
+Create a new custom profile with a specific base URL. This is useful for managing multiple RainMaker deployments.
+
+Usage:
+
+`python rainmaker_admin_cli.py account profile add <profile_name> --base-url <base_url> [--description <description>]`
+
+Arguments:
+- `<profile_name>`: Name of the profile to create
+- `--base-url <base_url>`: Base URL for the profile (required)
+- `--description <description>`: Optional description for the profile
+
+Example:
+
+`python rainmaker_admin_cli.py account profile add production --base-url https://api.rainmaker.example.com --description "Production deployment"`
+
+> **Note**: If a profile with the same name already exists, you'll be prompted to confirm overwriting it.
+
+##### Remove Profile
+
+Delete a custom profile. The default profile cannot be deleted.
+
+Usage:
+
+`python rainmaker_admin_cli.py account profile remove <profile_name>`
+
+Arguments:
+- `<profile_name>`: Name of the profile to remove
+
+> **Note**: You'll be prompted to confirm before deletion. If you delete the currently active profile, the CLI will automatically switch to the default profile.
 
 #### Login
 
 You need to login to get started and use the subsequent APIs. The email id for login would be the super admin user email configured during RainMaker deployment. The password should have been already received on that email at the end of the backend deployment process.
 
+Login credentials are stored per profile, so you can have different credentials for different deployments.
 
 Usage:
 
@@ -128,17 +209,17 @@ Usage:
 
 > **Note**: If password is not passed, it will be prompted for and not shown on screen for security reasons.
 
-> **Note**: Login configuration will be stored at location `~/.espressif/rainmaker/rainmaker_admin_config.json`
+> **Note**: Login configuration is stored per profile at location `~/.espressif/rainmaker/admin_profiles/`
 
 #### Logout
 
-To logout from the current session and clear stored credentials.
+To logout from the current session and clear stored credentials for the active profile.
 
 Usage:
 
 `python rainmaker_admin_cli.py account logout`
 
-> **Note**: This will logout from the server and remove local session data.
+> **Note**: This will logout from the server and remove local session data for the current profile only. Other profiles' credentials remain unaffected.
 
 
 **You can now use the rest of the commands once you have logged in successfully.**
