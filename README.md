@@ -304,7 +304,7 @@ For generating device certificates with ECDSA keys (faster, smaller certificates
 
 For simplest use case, the usage is as given below. If you want to add some custom data or customise some other parameters, please refer the subsequent sections.
 
-> Note that it is better to first create a small set of certificates, say 5, so that you get an idea about how the tool works.
+> Note that it is better to first create a small set of certificates, say 5, so that you get an idea about how the tool works. A maximum of 50,000 certificates can be generated in a single request.
 
 Example:
 `python rainmaker_admin_cli.py certs devicecert generate --count 5 --prov ble --outdir test`
@@ -430,7 +430,7 @@ optional arguments:
 ```
 
 For the example in device certificate generation section the node_certs_file file would be `test/2020-11-29/Mfg-00001/common/node_certs.csv`.
-This command will give a request id in response, which can be used for monitoring the status.
+This command will give a request id in response, which can be used for monitoring the status. A maximum of 50,000 certificates can be registered in a single request.
 
 ##### Adding Tags
 

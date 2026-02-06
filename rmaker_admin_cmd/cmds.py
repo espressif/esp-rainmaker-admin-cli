@@ -50,6 +50,9 @@ CACERT_FILENAME = "ca.crt"
 CA_KEY_FILENAME = "ca.key"
 DIR_PREFIX = "Mfg"
 
+# Maximum number of nodes supported in a single generation/registration request
+MAX_NODES_LIMIT = 50000
+
 
 def _create_date_dir(curr_outdir):
     '''
@@ -636,6 +639,12 @@ def generate_device_cert(vars=None):
 
         node_count = int(vars['count'])
 
+        # Check if --count exceeds maximum limit
+        if node_count > MAX_NODES_LIMIT:
+            log.error(f"\nMaximum of {MAX_NODES_LIMIT:,} nodes generation supported in a single request.")
+            log.error(f"Requested count: {node_count:,}. Please reduce the count or split into multiple batches.")
+            return
+
         extra_config = get_param_from_config('ADDITIONAL_CONFIG')
         extra_values = get_param_from_config('ADDITIONAL_VALUES')
 
@@ -681,6 +690,11 @@ def generate_device_cert(vars=None):
 
         if extra_values:
             node_count = count_extra_values_file_rows(extra_values)
+            # Check if ADDITIONAL_VALUES count exceeds maximum limit
+            if node_count > MAX_NODES_LIMIT:
+                log.error(f"\nMaximum of {MAX_NODES_LIMIT:,} nodes generation supported in a single request.")
+                log.error(f"ADDITIONAL_VALUES file contains {node_count:,} rows. Please split into multiple batches.")
+                return
 
         # Initialize start and length for prefixing filenames
         prefix_num = vars.get('prefix_num')
@@ -717,6 +731,11 @@ def generate_device_cert(vars=None):
                 log.error("Node Ids not found in the input file : {}".format(input_node_ids_file))
                 raise Exception("Invalid Input file.")
             node_id_list_unique = [*set(node_id_list)]
+            # Check if input file node count exceeds maximum limit
+            if len(node_id_list_unique) > MAX_NODES_LIMIT:
+                log.error(f"\nMaximum of {MAX_NODES_LIMIT:,} nodes generation supported in a single request.")
+                log.error(f"Input file contains {len(node_id_list_unique):,} unique node IDs. Please split your input file into smaller batches.")
+                return
             is_node_id_file = True
 
         # Get mqttendpoint
@@ -843,26 +862,35 @@ def _get_md5_checksum(filename):
 
 def _remove_empty_lines(input_file):
     ##Remove empty lines if present from csv file
+    row_count = 0
     with open(input_file) as in_file:
         with open("output_file.csv", 'w', newline='') as out_file:
             writer = csv.writer(out_file)
             for row in csv.reader(in_file):
                 if row:
                     writer.writerow(row)
+                    row_count += 1
     ##delete existing input_file before renaming
     if os.path.exists(input_file):
         os.remove(input_file)
     os.rename('output_file.csv',input_file)
-    return None
+    # Return row count excluding header
+    return row_count - 1 if row_count > 0 else 0
 
 def _check_file_type(input_file, skip_csv_validation=False, skip_cert_validation=False, validate_cert_cn=False):
     header_str = "certs"
     cert_str = "BEGIN CERTIFICATE"
 
     try:
-        _remove_empty_lines(input_file)
+        row_count = _remove_empty_lines(input_file)
     except Exception as e:
         log.error("\nError Validating Input file.Please check the input file.")
+        return False
+
+    # Check if node count exceeds maximum limit
+    if row_count > MAX_NODES_LIMIT:
+        log.error(f"\nMaximum of {MAX_NODES_LIMIT:,} nodes registration supported in a single request.")
+        log.error(f"Your CSV file contains {row_count:,} nodes. Please split your CSV file into smaller batches.")
         return False
 
     # Skip all CSV validation if requested
