@@ -825,6 +825,15 @@ def generate_device_cert(vars=None):
         # Get key type option
         key_type = vars.get('key_type', 'rsa')
 
+        # Get encryption override option
+        encr_enabled = None
+        encr_arg = vars.get('encryption')
+        if encr_arg not in [None, ""]:
+            encr_arg = str(encr_arg).strip().lower()
+            if encr_arg not in ["true", "false"]:
+                raise Exception("--encryption must be either 'true' or 'false'")
+            encr_enabled = (encr_arg == "true")
+
         # Generate Device Cert and save into file
         certs_dest_filename = gen_and_save_certs(ca_cert,
                                                  ca_private_key,
@@ -840,7 +849,7 @@ def generate_device_cert(vars=None):
                  'location: {}'.format(certs_dest_filename))
         # Generate binaries
         log.info("\nGenerating binaries for the device certficates generated")
-        gen_cert_bin(outdir, file_id, start, length)
+        gen_cert_bin(outdir, file_id, start, length, encr_enabled)
         log.info('\nYou can now run: \npython rainmaker_admin_cli.py certs '
                  'devicecert register --inputfile {} '
                  '(Register Generated Device Certificate(s))'.format(certs_dest_filename))
