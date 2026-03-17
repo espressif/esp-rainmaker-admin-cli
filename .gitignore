@@ -2,3 +2,5 @@ logs/*
 *.pyc
 .DS_Store
 .vscode
+ca_certificates/
+rmaker_admin_lib/serverconfig.py

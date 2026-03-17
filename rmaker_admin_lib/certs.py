@@ -939,7 +939,7 @@ def verify_mfg_files(outdir, config_filename, values_filename, file_id):
 
     log.debug("Extra config and values files verified")
 
-def gen_cert_bin(outdir, file_id, prefix_num_start, prefix_num_digits):
+def gen_cert_bin(outdir, file_id, prefix_num_start, prefix_num_digits, encr_enabled=None):
     '''
     Generate binaries for certificate(s)
 
@@ -951,6 +951,9 @@ def gen_cert_bin(outdir, file_id, prefix_num_start, prefix_num_digits):
 
     :param prefix_num_digits: Number of digits for prefix (default is 6)
     :type prefix_num_digits: str
+
+    :param encr_enabled: Override encryption option from config (True/False)
+    :type encr_enabled: bool|None
     '''
     log.debug("Setting config arguments for generating binaries")
     common_outdir = os.path.join(outdir, 'common')
@@ -962,6 +965,8 @@ def gen_cert_bin(outdir, file_id, prefix_num_start, prefix_num_digits):
     config.sections()
 
     keygen = config['DEFAULT'].getboolean('ENCR_ENABLED')
+    if encr_enabled is not None:
+        keygen = encr_enabled
     log.debug("Mfg input args: config file: {}, values file: {} \
         config: {}, outdir: {}, keygen: {}".format(
             dest_config_filename,

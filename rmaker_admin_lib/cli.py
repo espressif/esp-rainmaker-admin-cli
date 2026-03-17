@@ -449,6 +449,13 @@ COMMANDS = {
                 "arghelp": 'Generate QR code without pop field',
             },
             {
+                "argname": "--encryption",
+                "metavar": "<true|false>",
+                "default": "",
+                "arghelp": 'Override ENCR_ENABLED from config/binary_config.ini (true/false)',
+                "choices": ['true', 'false']
+            },
+            {
                 "argname": "--key_type",
                 "metavar": "<key_type>",
                 "default": "rsa",
