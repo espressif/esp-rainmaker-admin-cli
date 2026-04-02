@@ -512,7 +512,7 @@ COMMANDS = {
                 "argname": "--tags",
                 "metavar": "<node_tags>",
                 "default": "",
-                "arghelp": "Comma separated strings of tags to be attached to the nodes\n"
+                "arghelp": "Comma separated strings of tags to be attached to the nodes. When used with --update_nodes, replaces all existing admin-attached tags (does not append)\n"
             },
             {
                 "argname": "--force",
@@ -524,7 +524,7 @@ COMMANDS = {
                 "argname": "--update_nodes",
                 "default": False,
                 "action":"store_true",
-                "arghelp": "Whether to skip registration of the device certificates and only add the type, model, subtype and tags to the nodes(If --update_nodes is specified)\n"
+                "arghelp": "Whether to skip registration of the device certificates and only add the type, model, subtype and tags to the nodes.\nTags passed with this flag replace all existing admin-attached tags, not append\n"
             },
             {
                 "argname": "--node_policies",

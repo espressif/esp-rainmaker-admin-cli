@@ -1185,6 +1185,18 @@ def register_device_cert(vars=None):
                     return
         if force or update_nodes:
             log.warn("\nWARNING: Ensure your backend version is 2.7.1 or higher if using the force or update_nodes flag.")
+        # Warn about tag replacement semantics
+        if update_nodes and tags:
+            log.warn("\nWARNING: --update_nodes with --tags will REPLACE all admin-attached tags on matched nodes, not append. Tags added via admin APIs after initial registration will also be overwritten. Tags attached via user APIs will not be affected.")
+            conti = True
+            while conti:
+                goahead = input("Continue? (y/n):")
+                if goahead in ("y", "Y"):
+                    conti = False
+                elif goahead in ("n", "N"):
+                    return
+                else:
+                    log.error("Please enter a valid input.")
         #validate tags if present
         if tags:
             # Validations for the CSV file and tags

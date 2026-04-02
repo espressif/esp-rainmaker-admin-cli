@@ -458,6 +458,8 @@ After passing `--tags loc:@city`,
 
 > To use CSV based tags, i.e `city:@loc` where *loc* is a column in the CSV, the minimum rainmaker supported version is 1.1.28.
 
+> ⚠️ **When using `--tags` with `--update_nodes`:** Tags are **replaced**, not appended. If a node previously had admin-attached tags `a,b` and you pass `--tags b,c`, the node will end up with only `b,c` — tag `a` is removed. This also overwrites any tags added via admin APIs after initial registration. Tags attached via user APIs will not be affected.
+
 #### Check Device Certificate Registration Status
 
 The certificate registration process can take significant time. Once it is finished, the super admin user will get an email with the status. The same can also be checked using the `getcertstatus` command.
